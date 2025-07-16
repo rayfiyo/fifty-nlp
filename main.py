@@ -218,36 +218,29 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 4. データ読み込み
     splits = config["data"]["splits"]
-    logger.info(f"splits: {splits}")
-
     train_x, train_y = load_memmap(splits[0])
-    logger.info(f"len of raw train_x: {len(train_x)}")
-    logger.info(f"len of raw train_y: {len(train_y)}")
-
     val_x, val_y = load_memmap(splits[1])
-    logger.info(f"len of val_x: {len(val_x)}")
-    logger.info(f"len of val_y: {len(val_y)}")
-
     test_x, test_y = load_memmap(splits[2])
-    logger.info(f"len of test_x: {len(test_x)}")
-    logger.info(f"len of test_y: {len(test_y)}")
 
     # 5. ハイパーパラメータ定義
-    n_classes = int(train_y.max()) + 1  # 75 クラスへの出力の最終全結合 F(75) を動的に
-    logger.info(f"n_classes: {n_classes}")
+    tcfg = config["training"][config["training"].get("type", "cnn")]
 
-    batch_size = config["training"]["batch_size"]
+    batch_size = tcfg["batch_size"]
     logger.info(f"batch_size: {batch_size}")
 
-    epochs = config["training"]["epochs"]
+    epochs = tcfg["epochs"]
     logger.info(f"epochs: {epochs}")
 
-    lr = config["training"]["lr"]
+    lr = tcfg["lr"]
     logger.info(f"lr: {lr}")
 
-    # 6. 小規模な開発用サブセットを使用
-    n_subset = config["training"]["n_subset"]
+    n_classes = int(train_y.max()) + 1  # クラスへの出力の最終全結合 F(75) を動的に
+    logger.info(f"n_classes: {n_classes}")
+
+    n_subset = tcfg["n_subset"]
     logger.info(f"n_subset: {n_subset}")
+
+    # 6. 小規模な開発用サブセットを使用
     if len(train_y) > n_subset:
         rng = np.random.default_rng(seed=42)
         idx = rng.choice(len(train_y), size=n_subset, replace=False)
@@ -332,6 +325,12 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
             # パラメータ更新
             optimizer.step()
+
+            # 学習スケジューラ
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=epochs, eta_min=1e-5
+            )
+            scheduler.step()
 
             # 学習進捗の出力（最初の Epoch のみ）
             if epoch == 0 and batch_idx % progress_step == 0:
