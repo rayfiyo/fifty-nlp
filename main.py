@@ -18,6 +18,7 @@ PEP8 ＆ 日本語コメ
 from __future__ import annotations
 
 # 機械学習に関与
+from models import FiFTyModel, FiFTyLSTMModel  # models.py
 from torchinfo import summary  # 出力形状・パラメータ統計
 from torchview import draw_graph  # レイヤー構造図の可視化
 import numpy as np  # メモリマップや数値演算に使用
@@ -53,100 +54,13 @@ def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
     指定したデータセット(split)に対応する .npy ファイルを
     メモリマップとして読み込み、メモリ使用量を抑制する関数
     """
-    base_dir = Path(config["data"]["base_dir"]).expanduser() # ~ の展開
+    base_dir = Path(config["data"]["base_dir"]).expanduser()  # ~ の展開
     base = base_dir / split
 
     # 遅延ロードで RAM 最小化
     x = np.load(base / "x.npy", mmap_mode="r")
     y = np.load(base / "y.npy", mmap_mode="r")
     return x, y
-
-
-class FiFTyModel(nn.Module):
-    """
-    FiFTy 論文で提案された 1D-CNN 畳み込みニューラルネットワークの簡易実装。
-    入力: バイト系列 (整数列)
-    出力: クラス分類 (softmax logits)
-    """
-
-    def __init__(
-        self,
-        n_classes: int,
-        embed_dim: int,  # 埋め込み次元数
-        conv_channels: int,  # 1D畳み込み層の出力チャネル数
-        hidden: int,  # 全結合中間層のユニット数
-        kernel_size: int,  # 畳み込みカーネル幅
-        pool_size: int,  # プーリングサイズ
-        dropout: float,  # ドロップアウト率
-        num_blocks: int,  # 畳み込みブロック数: Conv → ReLU → Pool を繰り返す回数
-    ) -> None:
-        super().__init__()
-
-        # 出力確率化用 Softmax
-        self.softmax = nn.Softmax(dim=1)
-
-        # バイト（0〜255）を embed_dim 次元へ変換（埋め込み）
-        self.embed = nn.Embedding(256, embed_dim)
-
-        # 可変深さの畳み込みブロックを ModuleList で持つ
-        self.blocks = nn.ModuleList()
-        in_channels = embed_dim
-        for _ in range(num_blocks):
-            conv = nn.Conv1d(
-                in_channels,
-                conv_channels,
-                kernel_size,
-                stride=1,  # FiFTy はstride 1 前提の設計
-                padding=kernel_size // 2,  # カーネル幅を半分ずつ前後に埋めるパディング
-            )
-            # 重み初期化の明示: FiFTy は Keras なので He(Kaiming) 初期化をしている
-            nn.init.kaiming_normal_(conv.weight, nonlinearity="leaky_relu")
-            if conv.bias is not None:
-                nn.init.zeros_(conv.bias)
-
-            self.blocks.append(conv)
-            in_channels = conv_channels
-
-        # 活性化関数: FiFTy に基づく LeakyReLU(α=0.3) 。inplace は微小な高速化とメモリ節約
-        self.activation = nn.LeakyReLU(0.3, inplace=True)
-
-        # 時系列長を pool_size 分縮小
-        self.pool = nn.MaxPool1d(pool_size)
-
-        # 時系列長を 1 に平均化(AP)
-        self.gap = nn.AdaptiveAvgPool1d(1)
-
-        # 過学習抑制のためのノイズ挿入
-        self.dropout = nn.Dropout(dropout)
-
-        # 全結合層: 入力チャネル数（今回は畳み込みブロック後のチャネル数 conv_channels）を
-        # hidden 次元の特徴ベクトルに写像する全結合層
-        self.fc1 = nn.Linear(conv_channels, hidden)
-        nn.init.kaiming_normal_(self.fc1.weight, a=0.3, nonlinearity="leaky_relu")
-        nn.init.zeros_(self.fc1.bias)
-
-        # 出力層: hidden 次元ベクトルを最終的に
-        #         n_classes クラス分のロジット（未正規化確率）に写像する全結合層
-        self.fc2 = nn.Linear(hidden, n_classes)
-        nn.init.kaiming_normal_(self.fc2.weight, a=0.3, nonlinearity="leaky_relu")
-        nn.init.zeros_(self.fc2.bias)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """順伝播処理 (B, T) → (B, C)"""
-        # torchview から渡されるダミー入力が float の場合もあるので long にキャスト
-        x = x.long()
-        x = self.embed(x)  # (B, T, E): 埋め込み
-        x = x.permute(0, 2, 1)  # Conv1d 用に次元を入れ替え (B, E, T)
-        # ブロック数だけ繰り返す
-        for conv in self.blocks:
-            x = conv(x)
-            x = self.activation(x)  # LeakyReLU(0.3)
-            x = self.pool(x)
-        x = self.gap(x).squeeze(-1)  # (B, C): 特徴ベクトル。APに対応。
-        x = self.dropout(x)
-        x = self.fc1(x)
-        x = self.activation(x)  # LeakyReLU(0.3)
-        return self.fc2(x)  # (B, クラス数 75) のロジット出力
 
 
 def configure_logging(run_dir: Path) -> None:
@@ -344,16 +258,26 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 7. モデル構築
     mcfg = config["model"]
-    model = FiFTyModel(
-        n_classes=n_classes,
-        embed_dim=mcfg["embed_dim"],
-        conv_channels=mcfg["conv_channels"],
-        hidden=mcfg["hidden_dim"],
-        kernel_size=mcfg["kernel_size"],
-        pool_size=mcfg["pool_size"],
-        dropout=mcfg["dropout"],
-        num_blocks=mcfg.get("num_blocks", 2),
-    ).to(device)
+    if mcfg.get("type", "cnn") == "lstm":
+        model = FiFTyLSTMModel(
+            n_classes=n_classes,
+            embed_dim=mcfg["embed_dim"],
+            hidden=mcfg["hidden_dim"],
+            num_layers=mcfg["num_layers"],
+            bidirectional=mcfg["bidirectional"],
+            dropout=mcfg["dropout"],
+        ).to(device)
+    else:
+        model = FiFTyModel(
+            n_classes=n_classes,
+            embed_dim=mcfg["embed_dim"],
+            conv_channels=mcfg["conv_channels"],
+            hidden=mcfg["hidden_dim"],
+            kernel_size=mcfg["kernel_size"],
+            pool_size=mcfg["pool_size"],
+            dropout=mcfg["dropout"],
+            num_blocks=mcfg.get("num_blocks", 2),
+        ).to(device)
     # 確率的勾配降下法
     optimizer = torch.optim.Adam(
         model.parameters(),
@@ -400,8 +324,9 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             # 損失計算
             loss = nn.functional.cross_entropy(model(slab_x).float(), labels)
 
-            # 勾配計算
+            # 勾配計算と勾配爆発対策
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
 
             # パラメータ更新
             optimizer.step()
