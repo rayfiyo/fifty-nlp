@@ -257,8 +257,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         train_y = train_y[idx]
 
     # 7. モデル構築
-    mcfg = config["model"]
-    if mcfg.get("type", "cnn") == "lstm":
+    mcfg_root = config["model"]
+    mtype = mcfg_root.get("type", "cnn")
+    mcfg = mcfg_root[mtype]
+    if mtype == "lstm":
         model = FiFTyLSTMModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],
@@ -267,7 +269,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             bidirectional=mcfg["bidirectional"],
             dropout=mcfg["dropout"],
         ).to(device)
-    else:
+    elif mtype == "cnn":
         model = FiFTyModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],
