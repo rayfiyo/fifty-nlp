@@ -1,0 +1,71 @@
+# FiFTy 学習スクリプトのハイパーパラメータ設定ファイル
+# https://arxiv.org/abs/1908.06148v2
+# https://arxiv.org/pdf/1908.06148v2
+# https://www.alphaxiv.org/overview/1908.06148v2
+# https://github.com/mittalgovind/fifty
+
+data:
+  base_dir: "~/dataset/" # データセットのディレクトリ
+  splits: ["train", "val", "test"] # データセット(.npy) のファイル名
+
+# モデル構造（__init__→forward でデータが流れる順番）
+# FiFty の 512-byte Scenario #1 (All Classes 75) の最終モデル TABLE II を参考
+#   - E(64) - C1D(128, 27) - MP(4) - AP - D(0.1) - F(256) - F(75)
+#   - Global Average Pooling（GAP）で時系列長を1に集約
+#   - 全結合層:     256ユニット → 出力クラス数(75)
+#   - パラメータ数: 約 450 k
+#   - 平均精度:     77.5%
+model:
+  # 埋め込み次元数: バイト値をベクトル化する際の出力次元数
+  # FiFty: E(64)
+  embed_dim: 64
+
+  # 1D畳み込み層の出力チャネル数: 特徴マップの数。モデルの表現力に影響
+  # FiFty: C1D (128, 27) の第一引数
+  conv_channels: 128
+
+  # 畳み込みカーネル幅: 受容野の幅。局所的なバイトパターン検出の範囲
+  # FiFty: C1D (128, 27) の第二引数（フィルタサイズ）
+  kernel_size: 27
+
+  # プーリングサイズ: ダウンサンプリング率。計算量と情報保持のバランス
+  # FiFty: MP(4)
+  pool_size: 4
+
+  # AP(Adaptive Average Pooling) はコード中
+
+  # ドロップアウト率: 過学習防止のためにノードをランダムに無効化する確率
+  # FiFty: D(0.1)
+  dropout: 0.1
+
+  # 全結合中間層のユニット数: 畳み込み後特徴ベクトルを写像する次元
+  # FiFTy: 256
+  hidden_dim: 256
+
+  # 75クラスへの出力をする最終全結合 F(75) はコード中
+
+  # 畳み込みブロック数: Conv → ReLU → Pool を繰り返す回数
+  num_blocks: 1
+
+# 学習設定（典型的なステップ順）
+training:
+  # バッチサイズ: 1ステップでネットワークに入力して処理するサンプル数
+  # GPU があれば 256 程度、高性能 CPU であれば 128 程度が妥当か
+  batch_size: 128
+
+  # エポック数: 全データセットを何周学習するか。多いほど学習が深まるが過学習に注意
+  epochs: 30
+
+  # 学習率: モデルパラメータ更新時の学習の速さ。大きすぎると発散、小さすぎると収束が遅い
+  # FiFty: Adam(lr=1e-3)
+  lr: 0.001
+
+  # サブセットサイズ: 開発時に全データではなく一部のみで学習する場合のサンプル数
+  # サブセットしない場合 len(train_y) と同じ数を指定
+  # FiFty ではプロトタイピング時に約 10% （約 750 kサンプル）程度を採用
+  # 全部で 6144000 件の学習フラグメントが最大値
+  #   - 102,400 frag./type * 75 types * 0.8 train 割合
+  n_subset: 6144
+
+output:
+  result_dir: "result"
