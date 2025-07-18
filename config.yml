@@ -5,7 +5,20 @@ data: # データセットのパス周り
   splits: ["train", "val", "test"]
 
 model: # モデル構造（__init__→forward でデータが流れる順番）
-  type: "lstm"
+  # embed_dim:      埋め込み次元数:           バイト値をベクトル化する際の出力次元数
+  # hidden_dim:     全結合中間層のユニット数: 畳み込み後特徴ベクトルを写像する次元
+  # num_layers:     スタック層数
+  # bidirectional:  双方向か否か
+  # dropout:        ドロップアウト率: 過学習防止のためにノードをランダムに無効化する確率
+
+  type: "gru"
+
+  gru:
+    embed_dim: 64
+    hidden_dim: 256
+    num_layers: 2
+    bidirectional: true
+    dropout: 0.3
 
   lstm:
     embed_dim: 64 # 埋め込み次元数: バイト値をベクトル化する際の出力次元数
@@ -38,19 +51,30 @@ model: # モデル構造（__init__→forward でデータが流れる順番）
     num_blocks: 1 # 畳み込みブロック数: Conv → ReLU → Pool を繰り返す回数
 
 training: # 学習設定（典型的なステップ順）
-  type: "lstm"
+  # batch_size: バッチサイズ:     １ステップでネットワークに入力して処理するサンプル数
+  # epochs:     エポック数:       全データセットを何周学習するか。過学習注意
+  # lr:         学習率:           モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
+  # n_subset:   サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
+
+  type: "gru"
+
+  gru:
+    batch_size: 128
+    epochs: 30
+    lr: 0.0005
+    n_subset: 61400
 
   lstm:
-    batch_size: 128 # バッチサイズ: 1ステップでネットワークに入力して処理するサンプル数
-    epochs: 30 # エポック数: 全データセットを何周学習するか。過学習注意
-    lr: 0.0005 # 学習率: モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
-    n_subset: 61400 # サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
+    batch_size: 128
+    epochs: 30
+    lr: 0.0005
+    n_subset: 61400
 
   cnn:
-    batch_size: 128 # バッチサイズ: 1ステップでネットワークに入力して処理するサンプル数
-    epochs: 30 # エポック数: 全データセットを何周学習するか。過学習注意
-    lr: 0.001 # 学習率: モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
-    n_subset: 614 # サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
+    batch_size: 128
+    epochs: 30
+    lr: 0.001
+    n_subset: 614
 
 output:
   result_dir: "result"

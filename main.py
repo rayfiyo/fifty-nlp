@@ -18,7 +18,7 @@ PEP8 ＆ 日本語コメ
 from __future__ import annotations
 
 # 機械学習に関与
-from models import FiFTyModel, FiFTyLSTMModel  # models.py
+from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel  # models.py
 from torchinfo import summary  # 出力形状・パラメータ統計
 from torchview import draw_graph  # レイヤー構造図の可視化
 import numpy as np  # メモリマップや数値演算に使用
@@ -253,7 +253,16 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     mcfg_root = config["model"]
     mtype = mcfg_root.get("type", "cnn")
     mcfg = mcfg_root[mtype]
-    if mtype == "lstm":
+    if mtype == "gru":
+        model = FiFTyGRUModel(
+            n_classes=n_classes,
+            embed_dim=mcfg["embed_dim"],
+            hidden=mcfg["hidden_dim"],
+            num_layers=mcfg["num_layers"],
+            bidirectional=mcfg["bidirectional"],
+            dropout=mcfg["dropout"],
+        ).to(device)
+    elif mtype == "lstm":
         model = FiFTyLSTMModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],

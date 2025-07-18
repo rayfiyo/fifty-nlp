@@ -9,6 +9,59 @@ import torch
 import torch.nn as nn
 
 
+class FiFTyGRUModel(nn.Module):
+    """FiFTy 派生 GRU モデル（固定長 512byte）
+
+    - 構造: Embedding → (多層)Bi‑GRU → Dropout → 全結合
+    - GRU は LSTM よりパラメータと計算量が約 25 % 少なく高速
+    """
+
+    def __init__(
+        self,
+        n_classes: int,
+        *,
+        embed_dim: int = 64,
+        hidden: int = 256,
+        num_layers: int = 2,
+        bidirectional: bool = True,
+        dropout: float = 0.3,
+    ) -> None:
+        super().__init__()
+
+        # 1. 埋め込み: バイト列 → 実数ベクトル列
+        self.embed = nn.Embedding(256, embed_dim)
+
+        # 2. GRU
+        self.gru = nn.GRU(
+            input_size=embed_dim,
+            hidden_size=hidden,
+            num_layers=num_layers,
+            batch_first=True,  # (B, T, E) 形式
+            bidirectional=bidirectional,
+            dropout=dropout if num_layers > 1 else 0.0,
+        )
+
+        # 3. Dropout & 全結合
+        self.dropout = nn.Dropout(dropout)
+        fc_in = hidden * (2 if bidirectional else 1)
+        self.fc = nn.Linear(fc_in, n_classes)
+
+    # 順伝播
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """入力 (B, T) → ロジット (B, n_classes)"""
+        x = self.embed(x.long())  # (B, T, E)
+        _, h_n = self.gru(x)  # h_n: (layers*dir, B, H)
+
+        # 双方向の場合は順方向・逆方向を連結
+        if self.gru.bidirectional:
+            h = torch.cat((h_n[-2], h_n[-1]), dim=1)  # (B, 2H)
+        else:
+            h = h_n[-1]  # (B, H)
+
+        h = self.dropout(h)
+        return self.fc(h)  # (B, n_classes)
+
+
 class FiFTyLSTMModel(nn.Module):
     """FiFTy 派生 LSTM モデル（固定長 512byte）
 
@@ -33,13 +86,13 @@ class FiFTyLSTMModel(nn.Module):
     ) -> None:
         super().__init__()
 
-        # 埋め込み: バイト列 → 実数ベクトル列
+        # 1. 埋め込み: バイト列 → 実数ベクトル列
         self.embed = nn.Embedding(
             num_embeddings=256,  # バイト値の取り得る範囲 (0–255)
             embedding_dim=embed_dim,
         )
 
-        # LSTM 本体
+        # 2. LSTM
         self.lstm = nn.LSTM(
             input_size=embed_dim,  # Embedding 出力次元
             hidden_size=hidden,  # 隠れ状態のユニット数
@@ -49,13 +102,13 @@ class FiFTyLSTMModel(nn.Module):
             dropout=dropout if num_layers > 1 else 0.0,
         )
 
-        # 過学習抑制
+        # 3. 過学習抑制
         self.dropout = nn.Dropout(dropout)
 
-        # LSTM の最終隠れ状態 h_n のチャネル数を計算
+        # 4. LSTM の最終隠れ状態 h_n のチャネル数を計算
         fc_in = hidden * (2 if bidirectional else 1)
 
-        # 全結合: (B, fc_in) → (B, n_classes)
+        # 5. 全結合: (B, fc_in) → (B, n_classes)
         self.fc = nn.Linear(fc_in, n_classes)
 
         # [NOTE] Softmax は損失計算 (nn.CrossEntropyLoss) 側で内部的に適用済みのため不要
