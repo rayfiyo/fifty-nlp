@@ -44,7 +44,7 @@ import yaml  # 設定などを書いた config.yml を読み込むのに使用
 # config.yml の読み込み設定
 PWD = Path(__file__).parent
 config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
-
+run_type = config.get("type", "cnn")
 # __name__ をキーにすると、個別モジュール用ロガーが得られる
 logger = getLogger(__name__)
 
@@ -223,7 +223,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     test_x, test_y = load_memmap(splits[2])
 
     # 5. ハイパーパラメータ定義
-    tcfg = config["training"][config["training"].get("type", "cnn")]
+    # モデル設定を切り替え
+    mcfg = config["model"][run_type]
+    # 学習設定を切り替え
+    tcfg = config["training"][run_type]
 
     batch_size = tcfg["batch_size"]
     logger.info(f"batch_size: {batch_size}")
@@ -250,10 +253,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         train_y = train_y[idx]
 
     # 7. モデル構築
-    mcfg_root = config["model"]
-    mtype = mcfg_root.get("type", "cnn")
-    mcfg = mcfg_root[mtype]
-    if mtype == "gru":
+    if run_type == "gru":
         model = FiFTyGRUModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],
@@ -262,7 +262,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             bidirectional=mcfg["bidirectional"],
             dropout=mcfg["dropout"],
         ).to(device)
-    elif mtype == "lstm":
+    elif run_type == "lstm":
         model = FiFTyLSTMModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],
@@ -271,7 +271,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             bidirectional=mcfg["bidirectional"],
             dropout=mcfg["dropout"],
         ).to(device)
-    elif mtype == "cnn":
+    elif run_type == "cnn":
         model = FiFTyModel(
             n_classes=n_classes,
             embed_dim=mcfg["embed_dim"],

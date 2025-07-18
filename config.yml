@@ -1,5 +1,7 @@
 # FiFTy 学習スクリプトのハイパーパラメータ設定ファイル
 
+type: "gru" # モデルの種類: cnn / lstm / gru
+
 data: # データセットのパス周り
   base_dir: "~/dataset/"
   splits: ["train", "val", "test"]
@@ -11,7 +13,27 @@ model: # モデル構造（__init__→forward でデータが流れる順番）
   # bidirectional:  双方向か否か
   # dropout:        ドロップアウト率: 過学習防止のためにノードをランダムに無効化する確率
 
-  type: "gru"
+  cnn:
+    # FiFty の 512-byte Scenario #1 (All Classes 75) の最終モデル TABLE II を参考
+    # E(64), C1D (128, 27) の 128, C1D (128, 27) の 27, MP(4), D(0.1), 256
+    #   - Global Average Pooling（GAP）で時系列長を1に集約
+    #   - 全結合層:     256ユニット → 出力クラス数(75)
+    #   - 平均精度:     77.5%
+    # AP(Adaptive Average Pooling) と 75クラスへの出力をする最終全結合 F(75) はコード中
+    embed_dim: 64
+    conv_channels: 128 # 1D畳み込み層の出力チャネル数: 特徴マップの数。表現力に影響
+    kernel_size: 27 # 畳み込みカーネル幅: 受容野の幅。局所的なバイトパターン検出の範囲
+    pool_size: 4 # プーリングサイズ: ダウンサンプリング率。計算量と情報保持のバランス
+    dropout: 0.1
+    hidden_dim: 256
+    num_blocks: 1 # 畳み込みブロック数: Conv → ReLU → Pool を繰り返す回数
+
+  lstm:
+    embed_dim: 64
+    hidden_dim: 256
+    num_layers: 2
+    bidirectional: true
+    dropout: 0.3
 
   gru:
     embed_dim: 64
@@ -20,49 +42,17 @@ model: # モデル構造（__init__→forward でデータが流れる順番）
     bidirectional: true
     dropout: 0.3
 
-  lstm:
-    embed_dim: 64 # 埋め込み次元数: バイト値をベクトル化する際の出力次元数
-    hidden_dim: 256 # 全結合中間層のユニット数: 畳み込み後特徴ベクトルを写像する次元
-    num_layers: 2 # スタック層数
-    bidirectional: true # 双方向か否か
-    dropout: 0.3 # ドロップアウト率: 過学習防止のためにノードをランダムに無効化する確率
-
-  cnn:
-    # FiFty の 512-byte Scenario #1 (All Classes 75) の最終モデル TABLE II を参考
-    #   - E(64) - C1D(128, 27) - MP(4) - AP - D(0.1) - F(256) - F(75)
-    #   - Global Average Pooling（GAP）で時系列長を1に集約
-    #   - 全結合層:     256ユニット → 出力クラス数(75)
-    #   - パラメータ数: 約 450 k
-    #   - 平均精度:     77.5%
-    # - FiFty: E(64)
-    # - FiFty: C1D (128, 27) の第一引数
-    # - FiFty: C1D (128, 27) の第二引数（フィルタサイズ）
-    # - FiFty: MP(4)
-    # - FiFty: D(0.1)
-    # - FiFTy: 256
-    embed_dim: 64 # 埋め込み次元数: バイト値をベクトル化する際の出力次元数
-    conv_channels: 128 # 1D畳み込み層の出力チャネル数: 特徴マップの数。表現力に影響
-    kernel_size: 27 # 畳み込みカーネル幅: 受容野の幅。局所的なバイトパターン検出の範囲
-    pool_size: 4 # プーリングサイズ: ダウンサンプリング率。計算量と情報保持のバランス
-    # AP(Adaptive Average Pooling) はコード中
-    dropout: 0.1 # ドロップアウト率: 過学習防止のためにノードをランダムに無効化する確率
-    hidden_dim: 256 # 全結合中間層のユニット数: 畳み込み後特徴ベクトルを写像する次元
-    # 75クラスへの出力をする最終全結合 F(75) はコード中
-    num_blocks: 1 # 畳み込みブロック数: Conv → ReLU → Pool を繰り返す回数
-
 training: # 学習設定（典型的なステップ順）
   # batch_size: バッチサイズ:     １ステップでネットワークに入力して処理するサンプル数
   # epochs:     エポック数:       全データセットを何周学習するか。過学習注意
   # lr:         学習率:           モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
   # n_subset:   サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
 
-  type: "gru"
-
-  gru:
+  cnn:
     batch_size: 128
     epochs: 30
-    lr: 0.0005
-    n_subset: 61400
+    lr: 0.001
+    n_subset: 614
 
   lstm:
     batch_size: 128
@@ -70,11 +60,11 @@ training: # 学習設定（典型的なステップ順）
     lr: 0.0005
     n_subset: 61400
 
-  cnn:
+  gru:
     batch_size: 128
     epochs: 30
-    lr: 0.001
-    n_subset: 614
+    lr: 0.0005
+    n_subset: 61400
 
 output:
   result_dir: "result"
