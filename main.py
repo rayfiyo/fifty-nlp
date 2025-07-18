@@ -296,43 +296,43 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     progress_step = max(1, total_batches // 10)  # 10% ごとに進捗表示
 
     # 11. 学習ループ
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+        optimizer,
+        T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
+        eta_min=1e-5,  # 最終学習率 (最小値)
+    )
     for epoch in range(epochs):
-        model.train()  # 学習モード
-        for batch_idx in range(total_batches):
-            start = batch_idx * batch_size
+        # 学習モード
+        model.train()
 
-            # 入力テンソルとラベルの作成
+        # # バッチループ
+        for batch_idx in range(total_batches):
+            # 1. バッチ取り出し（memmap → Tensor、入力テンソルとラベルの作成）
+            start = batch_idx * batch_size
             slab_x = (
                 torch.from_numpy(train_x[start : start + batch_size].astype(np.uint8))
                 .long()
                 .to(device)
             )
             labels = (
-                torch.from_numpy(train_y[start : start + batch_size].copy())
-                .long()
-                .to(device)
+                torch.from_numpy(train_y[start : start + batch_size]).long().to(device)
             )
 
-            # 学習ステップ
+            # 2. 勾配初期化
             optimizer.zero_grad()
 
-            # 損失計算
-            loss = nn.functional.cross_entropy(model(slab_x).float(), labels)
+            # 3. 順伝播 → 損失計算
+            logits = model(slab_x).float()
+            loss = nn.functional.cross_entropy(logits, labels)
 
-            # 勾配計算と勾配爆発対策
+            # 4. 逆伝播（勾配計算）＋勾配クリッピング（LSTMは 0.5 が良き）
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
 
-            # パラメータ更新
+            # 5. パラメータ更新
             optimizer.step()
 
-            # 学習スケジューラ
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer, T_max=epochs, eta_min=1e-5
-            )
-            scheduler.step()
-
-            # 学習進捗の出力（最初の Epoch のみ）
+            # 最初のエポックだけ 10 % ごとに進捗表示
             if epoch == 0 and batch_idx % progress_step == 0:
                 percent = int(batch_idx / total_batches * 100)
                 logger.info(
@@ -340,7 +340,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
                     + f"progress {percent}% (batch {batch_idx + 1}/{total_batches})"
                 )
 
-        # 検証精度の評価（スモークテスト）
+        # 学習率を 1 段階更新
+        scheduler.step()
+
+        # 検証精度の評価（スモークテスト用バリデーション）
         if epoch == 0 or (epoch + 1) % 6 == 0:
             val_acc, val_batches, val_samples = eval_model(
                 model, val_x, val_y, batch_size, device, max_batches=300
