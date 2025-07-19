@@ -1,0 +1,53 @@
+2025-07-17 10:11:42 __main__ INFO: output duplicated to /home/kata/lstm-file-classifier/result/2025-07-17_10-11-42_f4a6d16/log.txt
+2025-07-17 10:11:42 __main__ INFO: batch_size: 128
+2025-07-17 10:11:42 __main__ INFO: epochs: 30
+2025-07-17 10:11:42 __main__ INFO: lr: 0.0005
+2025-07-17 10:11:42 __main__ INFO: n_classes: 75
+2025-07-17 10:11:42 __main__ INFO: n_subset: 61400
+2025-07-17 10:19:02 __main__ INFO: Epoch 1:progress 0% (batch 1/480)
+2025-07-17 11:13:23 __main__ INFO: Epoch 1:progress 10% (batch 49/480)
+2025-07-17 11:58:34 __main__ INFO: Epoch 1:progress 20% (batch 97/480)
+2025-07-17 12:48:29 __main__ INFO: Epoch 1:progress 30% (batch 145/480)
+2025-07-17 13:36:21 __main__ INFO: Epoch 1:progress 40% (batch 193/480)
+2025-07-17 14:18:28 __main__ INFO: Epoch 1:progress 50% (batch 241/480)
+2025-07-17 14:39:48 __main__ INFO: Epoch 1:progress 60% (batch 289/480)
+2025-07-17 14:56:25 __main__ INFO: Epoch 1:progress 70% (batch 337/480)
+2025-07-17 15:06:27 __main__ INFO: Epoch 1:progress 80% (batch 385/480)
+2025-07-17 15:14:49 __main__ INFO: Epoch 1:progress 90% (batch 433/480)
+2025-07-17 15:31:34 __main__ INFO: Epoch 1: Validation: batches=300, samples=38400, acc=0.185
+2025-07-17 15:31:34 __main__ INFO: Epoch 1: done!
+2025-07-17 16:48:55 __main__ INFO: Epoch 2: done!
+2025-07-17 18:06:23 __main__ INFO: Epoch 3: done!
+2025-07-17 19:21:38 __main__ INFO: Epoch 4: done!
+2025-07-17 20:37:44 __main__ INFO: Epoch 5: done!
+2025-07-17 22:05:34 __main__ INFO: Epoch 6: Validation: batches=300, samples=38400, acc=0.260
+2025-07-17 22:05:34 __main__ INFO: Epoch 6: done!
+2025-07-17 23:24:35 __main__ INFO: Epoch 7: done!
+2025-07-18 00:41:34 __main__ INFO: Epoch 8: done!
+2025-07-18 01:40:55 __main__ INFO: Epoch 9: done!
+2025-07-18 02:38:15 __main__ INFO: Epoch 10: done!
+2025-07-18 03:35:29 __main__ INFO: Epoch 11: done!
+2025-07-18 04:44:47 __main__ INFO: Epoch 12: Validation: batches=300, samples=38400, acc=0.282
+2025-07-18 04:44:47 __main__ INFO: Epoch 12: done!
+2025-07-18 05:42:22 __main__ INFO: Epoch 13: done!
+2025-07-18 06:43:49 __main__ INFO: Epoch 14: done!
+2025-07-18 07:42:34 __main__ INFO: Epoch 15: done!
+2025-07-18 08:41:03 __main__ INFO: Epoch 16: done!
+2025-07-18 09:44:03 __main__ INFO: Epoch 17: done!
+2025-07-18 10:51:54 __main__ INFO: Epoch 18: Validation: batches=300, samples=38400, acc=0.295
+2025-07-18 10:51:54 __main__ INFO: Epoch 18: done!
+2025-07-18 11:51:56 __main__ INFO: Epoch 19: done!
+2025-07-18 12:51:45 __main__ INFO: Epoch 20: done!
+2025-07-18 13:51:40 __main__ INFO: Epoch 21: done!
+2025-07-18 14:51:24 __main__ INFO: Epoch 22: done!
+2025-07-18 15:50:36 __main__ INFO: Epoch 23: done!
+2025-07-18 16:57:38 __main__ INFO: Epoch 24: Validation: batches=300, samples=38400, acc=0.305
+2025-07-18 16:57:38 __main__ INFO: Epoch 24: done!
+2025-07-18 17:57:16 __main__ INFO: Epoch 25: done!
+2025-07-18 18:56:02 __main__ INFO: Epoch 26: done!
+2025-07-18 19:55:10 __main__ INFO: Epoch 27: done!
+2025-07-18 20:54:38 __main__ INFO: Epoch 28: done!
+2025-07-18 21:53:05 __main__ INFO: Epoch 29: done!
+2025-07-18 22:59:11 __main__ INFO: Epoch 30: Validation: batches=300, samples=38400, acc=0.317
+2025-07-18 22:59:11 __main__ INFO: Epoch 30: done!
+2025-07-19 01:42:28 __main__ INFO: Full test accuracy: 0.317 (batches=6000, samples=768000)
