@@ -21,6 +21,7 @@ from __future__ import annotations
 from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel  # models.py
 from torchinfo import summary  # 出力形状・パラメータ統計
 from torchview import draw_graph  # レイヤー構造図の可視化
+import intel_extension_for_pytorch as ipex  # モデル最適化用
 import numpy as np  # メモリマップや数値演算に使用
 import torch  # テンソル操作と計算グラフに使用
 import torch.nn as nn  # ニューラルネットワークモジュールを nn として利用
@@ -47,6 +48,8 @@ config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
 run_type = config.get("type", "cnn")
 # __name__ をキーにすると、個別モジュール用ロガーが得られる
 logger = getLogger(__name__)
+# matmul の fast 前提許可 (float32→bfloat16混在を許す)
+torch.set_float32_matmul_precision("medium")
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -288,6 +291,15 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         lr=lr,
         betas=(0.9, 0.999),
     )
+    # IPEX + bfloat16 自動混合精度（モデルの最適化。GRU に依存している可能性あり）
+    odel, optimizer = ipex.optimize(
+        model,
+        optimizer=optimizer,  # 既存の Adam
+        dtype=torch.bfloat16,  # CPU でも非損失圧縮が可
+        level="O1",  # 速度重視プリセット
+    )
+    # torch.compile は IPEX 最適化後に（モデルの最適化。GRU に依存している可能性あり）
+    model = torch.compile(model, mode="default", fullgraph=True)
 
     # 8. モデル可視化ファイルをコンパイルと学習より前に行い、学習前の形状を記録
     save_model_visuals(
