@@ -50,6 +50,7 @@ config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
 run_type = config.get("type", "cnn")
 # __name__ をキーにすると、個別モジュール用ロガーが得られる
 logger = getLogger(__name__)
+logger.propagate = False  # ルートにバブリングさせない
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -218,7 +219,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 3. ログ二重化
     configure_logging(run_dir)
-    logger.info(f"output duplicated to {run_dir / 'log.txt'}")
 
     # 4. データ読み込み
     splits = config["data"]["splits"]
