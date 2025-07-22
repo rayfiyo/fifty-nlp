@@ -354,7 +354,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         model = torch.compile(model, mode="reduce-overhead")
 
     # 10. 学習のための値設定
-    total_batches = ceil(len(train_dl) / batch_size)  # 総バッチ数（切り上げ）
+    total_batches = ceil(len(train_y) / batch_size)  # 総バッチ数（切り上げ）
     progress_step = max(1, total_batches // 10)  # 10% ごとに進捗表示
 
     # 11. 学習ループ
@@ -365,7 +365,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     )
 
     # 学習ループ内の AMP
-    print()
     for epoch in range(epochs):
         # 学習モード
         model.train()
