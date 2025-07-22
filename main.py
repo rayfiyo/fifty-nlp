@@ -19,6 +19,7 @@ from __future__ import annotations
 
 # 機械学習に関与
 from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel  # models.py
+from torch.utils.data import Dataset, DataLoader  # DataLoader を利用
 from torchinfo import summary  # 出力形状・パラメータ統計
 from torchview import draw_graph  # レイヤー構造図の可視化
 import intel_extension_for_pytorch as ipex  # モデル最適化用
@@ -37,6 +38,7 @@ from logging import (  # 学習結果にタイムスタンプがほしいので�
     INFO,
 )
 import datetime as _dt  # タイムスタンプ生成に使用
+import os  # CPU プロセス数用
 import subprocess  # gitハッシュ取得に使用
 import sys  # コマンドライン引数・stdout 差し替えに使用
 import yaml  # 設定などを書いた config.yml を読み込むのに使用
@@ -48,8 +50,6 @@ config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
 run_type = config.get("type", "cnn")
 # __name__ をキーにすると、個別モジュール用ロガーが得られる
 logger = getLogger(__name__)
-# matmul の fast 前提許可 (float32→bfloat16混在を許す)
-torch.set_float32_matmul_precision("medium")
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -64,6 +64,30 @@ def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
     x = np.load(base / "x.npy", mmap_mode="r")
     y = np.load(base / "y.npy", mmap_mode="r")
     return x, y
+
+
+class MemmapDataset(Dataset):
+    """
+    NumPy memmap を直接読む Dataset（バイト列分類用）
+    """
+
+    # np.memmap を保持し、複製による RAM 消費を避ける
+    def __init__(self, x_memmap, y_memmap):
+        self.x, self.y = x_memmap, y_memmap
+
+    # サンプル総数を返す（DataLoader がバッチ分割に利用）
+    def __len__(self):
+        return len(self.y)
+
+    # idx 番目のサンプルを (Tensor, int) で返す
+    def __getitem__(self, idx):
+        # - x: 1D バイト系列 → long Tensor
+        x_tensor = torch.from_numpy(self.x[idx]).long()
+
+        # - y: 正解ラベル (int)
+        y_scalar = int(self.y[idx])
+
+        return x_tensor, y_scalar
 
 
 def configure_logging(run_dir: Path) -> None:
@@ -98,25 +122,13 @@ def configure_logging(run_dir: Path) -> None:
 
 
 def eval_model(
-    model: torch.nn.Module,  # 評価対象モデル
-    x_memmap: np.memmap,  # 評価データ
-    y_memmap: np.memmap,  # 評価データ
-    batch_size: int,  # バッチサイズ
-    device: str = "cpu",  # 'cpu' or 'cuda'
-    *,  # 以降は任意、キー=値 の形式で与える必要通用がある
-    max_batches: int | None = None,  # 最大評価バッチ数で。None なら全バッチ
-    subset_ratio: float | None = None,  # 評価データの割合 [0.0～1.0]。None なら全データ
+    model: torch.nn.Module,
+    loader: DataLoader,
+    device: str = "cpu",
 ) -> tuple[float, int, int]:
     """
     評価用関数：モデルを評価モードに切り替え、
     検証データをバッチ単位で処理して精度 (accuracy) を計算する。
-
-    スモークテスト用の max_batches と subset_ratio は併用可能。
-    両方指定時は先に subset_ratio で絞り、さらに max_batches で上限を掛ける。
-    例: 動作確認＋大きなバグ検出のため、最初の100バッチだけ評価
-    max_batches=100
-    例: 学習曲線の山谷をざっくり把握のため、検証データの10%だけを全バッチ評価
-    subset_ratio=0.1
 
     Dropout や BatchNorm を無効化するとOOMエラーになる。 # preds, trues = [], []
     """
@@ -124,34 +136,23 @@ def eval_model(
     correct = 0
     total = 0
 
-    # データ量を subset_ratio で絞る
-    if subset_ratio is not None:
-        N = int(len(y_memmap) * subset_ratio)
-        x_memmap = x_memmap[:N]
-        y_memmap = y_memmap[:N]
-
-    # 総バッチ数を算出し、max_batches で制限
-    total_batches = ceil(len(y_memmap) / batch_size)
-    if max_batches is not None:
-        total_batches = min(total_batches, max_batches)
-
-    # 勾配計算を無効化
-    with torch.no_grad():
-        for batch_idx in range(total_batches):
-            # 入力データのバッチを作成
-            start = batch_idx * batch_size
-            slab = x_memmap[start : start + batch_size].astype(np.uint8)
-            logits = model(torch.from_numpy(slab).long().to(device))
-
-            # バッチごとに正解数を加算（ストリーミング）
-            pred_np = torch.argmax(logits, dim=1).cpu().numpy()
-            true_np = y_memmap[start : start + batch_size]
-            correct += (pred_np == true_np).sum()
-            total += true_np.shape[0]
+    with torch.no_grad(), (
+        torch.cuda.amp.autocast()
+        if device.startswith("cuda")
+        else torch.cpu.amp.autocast(dtype=torch.bfloat16)
+    ):
+        for inputs, true_y in loader:
+            # GPU利用時は non_blocking=True で転送を非同期化できる
+            inputs = inputs.to(device, non_blocking=False)
+            logits = model(inputs)
+            pred = torch.argmax(logits, dim=1).cpu().numpy()
+            true_np = true_y.numpy()
+            correct += (pred == true_np).sum()
+            total += len(true_np)
 
     # ストリーミング集計した正解率を返す
-    accuracy = float(correct) / float(total) if total > 0 else 0.0
-    return accuracy, total_batches, total
+    accuracy = correct / total if total > 0 else 0.0
+    return accuracy, len(loader), total
 
 
 def save_model_visuals(
@@ -230,32 +231,69 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     mcfg = config["model"][run_type]
     # 学習設定を切り替え
     tcfg = config["training"][run_type]
-
+    #
     batch_size = tcfg["batch_size"]
     logger.info(f"batch_size: {batch_size}")
-
+    #
     epochs = tcfg["epochs"]
     logger.info(f"epochs: {epochs}")
-
+    #
     lr = tcfg["lr"]
     logger.info(f"lr: {lr}")
-
+    #
     n_classes = int(train_y.max()) + 1  # クラスへの出力の最終全結合 F(75) を動的に
     logger.info(f"n_classes: {n_classes}")
-
+    #
     n_subset = tcfg["n_subset"]
     logger.info(f"n_subset: {n_subset}")
+    #
+    eta_min = tcfg.get("eta_min", 1e-5)
+    logger.info(f"eta_min: {eta_min}")
+    #
+    num_workers = tcfg.get("num_workers", os.cpu_count() or 1)
+    logger.info(f"num_workers: {num_workers}")
 
     # 6. 小規模な開発用サブセットを使用
     if len(train_y) > n_subset:
         rng = np.random.default_rng(seed=42)
         idx = rng.choice(len(train_y), size=n_subset, replace=False)
         # .copy() を末尾につけると RAM に複製される
-        # つけないと memmap のままで RAM 消費ゼロ
+        # つけないと memmap のままインデックスなので RAM 消費ゼロ
         train_x = train_x[idx]
         train_y = train_y[idx]
 
-    # 7. モデル構築
+    # 7. DataLoader 生成
+    pin_memory = device != "cpu"  # ピンメモリは GPU 時に有効化
+    if len(train_y) > n_subset:
+        subset_idx = np.random.default_rng(42).choice(
+            len(train_y), n_subset, replace=False
+        )
+        sampler = torch.utils.data.SubsetRandomSampler(subset_idx)
+    else:
+        sampler = None
+    train_dl = DataLoader(
+        MemmapDataset(train_x, train_y),
+        batch_size=batch_size,
+        shuffle=(sampler is None),  # データ順序をエポック毎にシャッフル
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    val_dl = DataLoader(
+        MemmapDataset(val_x, val_y),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+    test_dl = DataLoader(
+        MemmapDataset(test_x, test_y),
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+    )
+
+    # 8. モデル構築
     if run_type == "gru":
         model = FiFTyGRUModel(
             n_classes=n_classes,
@@ -291,17 +329,9 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         lr=lr,
         betas=(0.9, 0.999),
     )
-    # IPEX + bfloat16 自動混合精度（モデルの最適化。GRU に依存している可能性あり）
-    odel, optimizer = ipex.optimize(
-        model,
-        optimizer=optimizer,  # 既存の Adam
-        dtype=torch.bfloat16,  # CPU でも非損失圧縮が可
-        level="O1",  # 速度重視プリセット
-    )
-    # torch.compile は IPEX 最適化後に（モデルの最適化。GRU に依存している可能性あり）
-    model = torch.compile(model, mode="default", fullgraph=True)
 
-    # 8. モデル可視化ファイルをコンパイルと学習より前に行い、学習前の形状を記録
+    # 9. モデルの最適化
+    # モデル可視化ファイルをコンパイル
     save_model_visuals(
         model,
         run_dir,
@@ -309,49 +339,65 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         batch_size=batch_size,
     )
 
-    # 9. PyTorch 2.0 実行最適化
-    model = torch.compile(model, mode="reduce-overhead")
+    if device == "cpu":
+        model, optimizer = ipex.optimize(
+            model, optimizer=optimizer, dtype=torch.bfloat16, level="O1"
+        )
+        torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
+    else:
+        # GPU: IPEX不要
+        torch.backends.cuda.matmul.allow_tf32 = True
+        # PyTorch 2.0 実行最適化
+        model = torch.compile(model, mode="reduce-overhead")
 
     # 10. 学習のための値設定
-    total_batches = ceil(len(train_y) / batch_size)  # 総バッチ数（切り上げ）
+    total_batches = ceil(len(train_dl) / batch_size)  # 総バッチ数（切り上げ）
     progress_step = max(1, total_batches // 10)  # 10% ごとに進捗表示
 
     # 11. 学習ループ
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
         T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
-        eta_min=1e-5,  # 最終学習率 (最小値)
+        eta_min=eta_min,  # 最終学習率 (最小値)
     )
+
+    # CPU 用と GPU 用の autocast オブジェクトと引数を準備
+    if device == "cpu":
+        # CPU 時は bfloat16 演算を指定
+        Autocast = torch.cpu.amp.autocast
+        autocast_kwargs = {"dtype": torch.bfloat16}
+    else:
+        # GPU 時は float16 がデフォルト、引数なしで呼び出し
+        Autocast = torch.cuda.amp.autocast
+        autocast_kwargs = {}
+
+    # 学習ループ内の AMP
     for epoch in range(epochs):
         # 学習モード
         model.train()
 
-        # # バッチループ
-        for batch_idx in range(total_batches):
+        # バッチループ
+        for batch_idx, (inputs, labels) in enumerate(train_dl):
             # 1. バッチ取り出し（memmap → Tensor、入力テンソルとラベルの作成）
-            start = batch_idx * batch_size
-            slab_x = (
-                torch.from_numpy(train_x[start : start + batch_size].astype(np.uint8))
-                .long()
-                .to(device)
-            )
-            labels = (
-                torch.from_numpy(train_y[start : start + batch_size]).long().to(device)
-            )
+            #   non_blocking=True で転送を非同期化（GPU 利用時向け）
+            inputs = inputs.to(device, non_blocking=False)
+            labels = labels.to(device, non_blocking=False)
 
             # 2. 勾配初期化
             optimizer.zero_grad()
 
-            # 3. 順伝播 → 損失計算
-            logits = model(slab_x).float()
-            loss = nn.functional.cross_entropy(logits, labels)
+            # 3. 自動混合精度 (AMP) での損失計算
+            # CPU／GPU に合わせて autocast を適用
+            with Autocast(**autocast_kwargs):
+                outputs = model(inputs)
+                loss = torch.nn.functional.cross_entropy(outputs, labels)
 
-            # 4. 逆伝播（勾配計算）＋勾配クリッピング（LSTMは 0.5 が良き）
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=0.5)
-
-            # 5. パラメータ更新
-            optimizer.step()
+            # 4. 後処理
+            loss.backward()  # 逆伝播（勾配計算）
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=0.5
+            )  # 勾配クリッピング
+            optimizer.step()  # パラメータ更新
 
             # 最初のエポックだけ 10 % ごとに進捗表示
             if epoch == 0 and batch_idx % progress_step == 0:
@@ -366,9 +412,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
         # 検証精度の評価（スモークテスト用バリデーション）
         if epoch == 0 or (epoch + 1) % 6 == 0:
-            val_acc, val_batches, val_samples = eval_model(
-                model, val_x, val_y, batch_size, device, max_batches=300
-            )
+            val_acc, val_batches, val_samples = eval_model(model, val_dl, device)
             logger.info(
                 f"Epoch {epoch + 1}: Validation:"
                 + f" batches={val_batches}, samples={val_samples}, acc={val_acc:.3f}"
@@ -378,9 +422,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         logger.info(f"Epoch {epoch + 1}: done!")
 
     # 12. テストデータでの最終評価
-    # タプルをアンパックして、accuracy（float）のみ取り出す
     full_test_acc, full_test_batches, full_test_samples = eval_model(
-        model, test_x, test_y, batch_size, device
+        model, test_dl, device
     )
     logger.info(
         f"Full test accuracy: {full_test_acc:.3f} "
