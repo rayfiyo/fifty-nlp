@@ -20,10 +20,8 @@ from __future__ import annotations
 # 機械学習に関与
 from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel  # models.py
 from torchinfo import summary  # 出力形状・パラメータ統計
-from torch.utils.data import DataLoader, Dataset  # DataLoader 用
 from torchview import draw_graph  # レイヤー構造図の可視化
 import intel_extension_for_pytorch as ipex  # モデル最適化用
-import multiprocessing as mp  # DataLoader 用
 import numpy as np  # メモリマップや数値演算に使用
 import torch  # テンソル操作と計算グラフに使用
 import torch.nn as nn  # ニューラルネットワークモジュールを nn として利用
@@ -66,31 +64,6 @@ def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
     x = np.load(base / "x.npy", mmap_mode="r")
     y = np.load(base / "y.npy", mmap_mode="r")
     return x, y
-
-
-class MemmapDataset(Dataset):
-    """memmap された .npy を直接読む軽量 Dataset
-
-    - np.memmap → Tensor 変換を 1 サンプル単位で行う
-    - __getitem__ は極力軽く保ち、CPU⇆RAM コピーを最小化
-    - x の dtype が uint8 なら astype をスキップして高速化
-    """
-
-    def __init__(self, x_mm: np.memmap, y_mm: np.memmap) -> None:
-        assert len(x_mm) == len(y_mm)
-        self.x, self.y = x_mm, y_mm
-        self._needs_cast = self.x.dtype != np.uint8
-
-    def __len__(self) -> int:
-        return len(self.y)
-
-    def __getitem__(self, idx: int):
-        x_np = self.x[idx]
-        if self._needs_cast:  # 型変換
-            x_np = x_np.astype(np.uint8, copy=False)
-        x = torch.from_numpy(x_np).long()  # (T,) → long Tensor (ゼロコピー)
-        y = torch.tensor(int(self.y[idx]), dtype=torch.long)
-        return x, y
 
 
 def configure_logging(run_dir: Path) -> None:
@@ -179,19 +152,6 @@ def eval_model(
     # ストリーミング集計した正解率を返す
     accuracy = float(correct) / float(total) if total > 0 else 0.0
     return accuracy, total_batches, total
-
-
-def eval_model_dl(model: nn.Module, loader: DataLoader, device: str = "cpu") -> float:
-    """DataLoader 版の評価関数 (Accuracy を返す)"""
-    model.eval()
-    correct = total = 0
-    with torch.no_grad():
-        for slab_x, labels in loader:
-            logits = model(slab_x.to(device, non_blocking=True))
-            preds = torch.argmax(logits, 1).cpu()
-            correct += (preds == labels).sum().item()
-            total += labels.size(0)
-    return correct / total
 
 
 def save_model_visuals(
@@ -286,23 +246,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     n_subset = tcfg["n_subset"]
     logger.info(f"n_subset: {n_subset}")
 
-    # 6. DataLoader の作成
-    cpu_cores = mp.cpu_count()
-    num_workers = min(4, cpu_cores // 2)  # 軽量 CPU なので半分程度
-    loader_kw = dict(
-        batch_size=batch_size,
-        num_workers=num_workers,
-        pin_memory=True,
-        prefetch_factor=4,
-        persistent_workers=True,
-    )
-    train_loader = DataLoader(
-        MemmapDataset(train_x, train_y), shuffle=True, **loader_kw
-    )
-    val_loader = DataLoader(MemmapDataset(val_x, val_y), shuffle=False, **loader_kw)
-    test_loader = DataLoader(MemmapDataset(test_x, test_y), shuffle=False, **loader_kw)
-
-    # 7. 小規模な開発用サブセットを使用
+    # 6. 小規模な開発用サブセットを使用
     if len(train_y) > n_subset:
         rng = np.random.default_rng(seed=42)
         idx = rng.choice(len(train_y), size=n_subset, replace=False)
@@ -311,7 +255,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         train_x = train_x[idx]
         train_y = train_y[idx]
 
-    # 8. モデル構築
+    # 7. モデル構築
     if run_type == "gru":
         model = FiFTyGRUModel(
             n_classes=n_classes,
@@ -348,22 +292,24 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         betas=(0.9, 0.999),
     )
     # IPEX + bfloat16 自動混合精度（モデルの最適化。GRU に依存している可能性あり）
-    model, optimizer = ipex.optimize(
+    odel, optimizer = ipex.optimize(
         model,
         optimizer=optimizer,  # 既存の Adam
         dtype=torch.bfloat16,  # CPU でも非損失圧縮が可
         level="O1",  # 速度重視プリセット
     )
+    # torch.compile は IPEX 最適化後に（モデルの最適化。GRU に依存している可能性あり）
+    model = torch.compile(model, mode="default", fullgraph=True)
 
-    # 9. 最適化
-    # モデル可視化ファイルを学習より前に保存
+    # 8. モデル可視化ファイルをコンパイルと学習より前に行い、学習前の形状を記録
     save_model_visuals(
         model,
         run_dir,
         input_length=train_x.shape[1],
         batch_size=batch_size,
     )
-    # PyTorch 2.0 実行最適化
+
+    # 9. PyTorch 2.0 実行最適化
     model = torch.compile(model, mode="reduce-overhead")
 
     # 10. 学習のための値設定
@@ -381,10 +327,17 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         model.train()
 
         # # バッチループ
-        for batch_idx, (slab_x, labels) in enumerate(train_loader):
-            # 1. バッチ取り出し（DataLoader から得た Tensor を非同期でデバイスへ）
-            slab_x = slab_x.to(device, non_blocking=True)
-            labels = labels.to(device, non_blocking=True)
+        for batch_idx in range(total_batches):
+            # 1. バッチ取り出し（memmap → Tensor、入力テンソルとラベルの作成）
+            start = batch_idx * batch_size
+            slab_x = (
+                torch.from_numpy(train_x[start : start + batch_size].astype(np.uint8))
+                .long()
+                .to(device)
+            )
+            labels = (
+                torch.from_numpy(train_y[start : start + batch_size]).long().to(device)
+            )
 
             # 2. 勾配初期化
             optimizer.zero_grad()
@@ -413,7 +366,9 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
         # 検証精度の評価（スモークテスト用バリデーション）
         if epoch == 0 or (epoch + 1) % 6 == 0:
-            val_acc = eval_model_dl(model, val_loader, device)
+            val_acc, val_batches, val_samples = eval_model(
+                model, val_x, val_y, batch_size, device, max_batches=300
+            )
             logger.info(
                 f"Epoch {epoch + 1}: Validation:"
                 + f" batches={val_batches}, samples={val_samples}, acc={val_acc:.3f}"
@@ -424,7 +379,9 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 12. テストデータでの最終評価
     # タプルをアンパックして、accuracy（float）のみ取り出す
-    full_test_acc = eval_model_dl(model, test_loader, device)
+    full_test_acc, full_test_batches, full_test_samples = eval_model(
+        model, test_x, test_y, batch_size, device
+    )
     logger.info(
         f"Full test accuracy: {full_test_acc:.3f} "
         f"(batches={full_test_batches}, samples={full_test_samples})"
