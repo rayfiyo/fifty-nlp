@@ -1,6 +1,5 @@
 intel_extension_for_pytorch==2.7.0
 numpy==2.3.1
-pytest==8.4.1
 PyYAML==6.0.2
 PyYAML==6.0.2
 torch==2.7.1
