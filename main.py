@@ -340,7 +340,12 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     )
 
     if device == "cpu":
-        model, optimizer = ipex.optimize(model, optimizer=optimizer, level="O1")
+        model, optimizer = ipex.optimize(
+            model,
+            optimizer=optimizer,
+            level="O1",
+            autocast=False,  # IPEX の内部 autocast がオンだと警告出ちゃう
+        )
         torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
     else:
         # GPU: IPEX不要
