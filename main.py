@@ -36,6 +36,7 @@ from logging import (  # 学習結果にタイムスタンプがほしいので�
     StreamHandler,
     Formatter,
     INFO,
+    ERROR,
 )
 import datetime as _dt  # タイムスタンプ生成に使用
 import os  # CPU プロセス数用
@@ -48,8 +49,10 @@ import yaml  # 設定などを書いた config.yml を読み込むのに使用
 PWD = Path(__file__).parent
 config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
 run_type = config.get("type", "cnn")
-# __name__ をキーにすると、個別モジュール用ロガーが得られる
-logger = getLogger(__name__)
+
+# ロギング周りの設定
+getLogger("torch_ipex").setLevel(ERROR)  # IPEX の内部 AutocastCPU で警告が出る対策
+logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
 logger.propagate = False  # ルートにバブリングさせない
 
 
@@ -340,12 +343,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     )
 
     if device == "cpu":
-        model, optimizer = ipex.optimize(
-            model,
-            optimizer=optimizer,
-            level="O1",
-            autocast=False,  # IPEX の内部 autocast がオンだと警告出ちゃう
-        )
+        model, optimizer = ipex.optimize(model, optimizer=optimizer, level="O1")
         torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
     else:
         # GPU: IPEX不要
