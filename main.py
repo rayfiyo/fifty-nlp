@@ -341,7 +341,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     if device == "cpu":
         model, optimizer = ipex.optimize(
-            model, optimizer=optimizer, dtype=torch.bfloat16, level="O1"
+            model, optimizer=optimizer, dtype=torch.float, level="O1"
         )
         torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
     else:
