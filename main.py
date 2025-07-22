@@ -46,10 +46,6 @@ import sys
 import yaml
 
 
-#  oneDNN（AutocastCPU） の C++ 層からの警告を抑制する
-os.environ["DNNL_VERBOSE"] = "0"  # oneDNN の verbose ログを完全抑制
-os.environ["IPEX_LOG_LEVEL"] = "ERROR"  # IPEX Python ロガーを ERROR 以上に
-
 # config.yml の読み込み設定
 PWD = Path(__file__).parent
 config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
