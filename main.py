@@ -17,6 +17,7 @@ PEP8 ＆ 日本語コメ
 
 from __future__ import annotations
 
+
 # 機械学習に関与
 from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel
 from torch import amp
@@ -45,6 +46,10 @@ import sys
 import yaml
 
 
+#  oneDNN（AutocastCPU） の C++ 層からの警告を抑制する
+os.environ["DNNL_VERBOSE"] = "0"  # oneDNN の verbose ログを完全抑制
+os.environ["IPEX_LOG_LEVEL"] = "ERROR"  # IPEX Python ロガーを ERROR 以上に
+
 # config.yml の読み込み設定
 PWD = Path(__file__).parent
 config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
@@ -53,8 +58,6 @@ run_type = config.get("type", "cnn")
 # ロギング周りの設定
 logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
 logger.propagate = False  # ルートにバブリングさせない
-os.environ["IPEX_LOG_LEVEL"] = "ERROR"  # IPEX の内部ログ抑制
-os.environ["DNNL_VERBOSE"] = "0"  # oneDNN の詳細ログを抑止
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
