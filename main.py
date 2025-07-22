@@ -254,9 +254,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     #
     eta_min = tcfg.get("eta_min", 1e-5)
     logger.info(f"eta_min: {eta_min}")
-    #
-    num_workers = tcfg.get("num_workers", os.cpu_count() or 1)
-    logger.info(f"num_workers: {num_workers}")
 
     # 6. 小規模な開発用サブセットを使用
     if len(train_y) > n_subset:
@@ -280,21 +277,18 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         MemmapDataset(train_x, train_y),
         batch_size=batch_size,
         shuffle=(sampler is None),  # データ順序をエポック毎にシャッフル
-        num_workers=num_workers,
         pin_memory=pin_memory,
     )
     val_dl = DataLoader(
         MemmapDataset(val_x, val_y),
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
         pin_memory=pin_memory,
     )
     test_dl = DataLoader(
         MemmapDataset(test_x, test_y),
         batch_size=batch_size,
         shuffle=False,
-        num_workers=num_workers,
         pin_memory=pin_memory,
     )
 

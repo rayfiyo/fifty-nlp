@@ -47,7 +47,8 @@ training: # 学習設定（典型的なステップ順）
   # epochs:     エポック数:   全データセットを何周学習するか。過学習注意
   # lr:         学習率:       モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
   # n_subset:         サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
-  # num_workers:      並列プリフェッチするためのCPUコア数（DataLoaderワーカープロセス数）
+  # ---
+  # マルチプロセス読込は memmap と相性が悪いので num_workers などは設定しない
 
   cnn:
     batch_size: 128
@@ -55,7 +56,6 @@ training: # 学習設定（典型的なステップ順）
     lr: 0.001
     n_subset: 614
     eta_min: 1.0e-5
-    num_workers: 4
 
   lstm:
     batch_size: 128
@@ -63,7 +63,6 @@ training: # 学習設定（典型的なステップ順）
     lr: 0.0005
     n_subset: 61440
     eta_min: 1.0e-5
-    num_workers: 4
 
   gru:
     batch_size: 128
@@ -71,7 +70,6 @@ training: # 学習設定（典型的なステップ順）
     lr: 0.0005
     n_subset: 6144
     eta_min: 1.0e-5
-    num_workers: 4
 
 output:
   result_dir: "result"
