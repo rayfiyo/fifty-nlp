@@ -18,31 +18,31 @@ PEP8 ＆ 日本語コメ
 from __future__ import annotations
 
 # 機械学習に関与
-from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel  # models.py
-from torch.utils.data import Dataset, DataLoader  # DataLoader を利用
-from torchinfo import summary  # 出力形状・パラメータ統計
-from torchview import draw_graph  # レイヤー構造図の可視化
-import intel_extension_for_pytorch as ipex  # モデル最適化用
-import numpy as np  # メモリマップや数値演算に使用
-import torch  # テンソル操作と計算グラフに使用
-import torch.nn as nn  # ニューラルネットワークモジュールを nn として利用
+from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel
+from torch import amp
+from torch.utils.data import Dataset, DataLoader
+import intel_extension_for_pytorch as ipex
+import numpy as np
+import torch
+import torch.nn as nn
 
 # ログなどの表示調整に関与
-from math import ceil  # 進捗割合の計算に使用
-from pathlib import Path  # パス操作に使用
-from logging import (  # 学習結果にタイムスタンプがほしいのでロガーを使用
+from logging import (
     getLogger,
     FileHandler,
     StreamHandler,
     Formatter,
     INFO,
-    ERROR,
 )
-import datetime as _dt  # タイムスタンプ生成に使用
-import os  # CPU プロセス数用
-import subprocess  # gitハッシュ取得に使用
-import sys  # コマンドライン引数・stdout 差し替えに使用
-import yaml  # 設定などを書いた config.yml を読み込むのに使用
+from math import ceil
+from pathlib import Path
+from torchinfo import summary
+from torchview import draw_graph
+import datetime as _dt
+import os
+import subprocess
+import sys
+import yaml
 
 
 # config.yml の読み込み設定
@@ -51,9 +51,10 @@ config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
 run_type = config.get("type", "cnn")
 
 # ロギング周りの設定
-getLogger("torch_ipex").setLevel(ERROR)  # IPEX の内部 AutocastCPU で警告が出る対策
 logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
 logger.propagate = False  # ルートにバブリングさせない
+os.environ["IPEX_LOG_LEVEL"] = "ERROR"  # IPEX の内部ログ抑制
+os.environ["DNNL_VERBOSE"] = "0"  # oneDNN の詳細ログを抑止
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -361,8 +362,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
         eta_min=eta_min,  # 最終学習率 (最小値)
     )
-    Autocast = torch.cuda.amp.autocast
-    autocast_kwargs = {}
 
     # 学習ループ内の AMP
     print()
@@ -382,7 +381,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
             # 3. 自動混合精度 (AMP) での損失計算
             # CPU／GPU に合わせて autocast を適用
-            with Autocast(**autocast_kwargs):
+            with amp.autocast(
+                device_type=("cuda" if device == "cuda" else "cpu"),
+                dtype=(None if device == "cuda" else torch.bfloat16),
+            ):
                 outputs = model(inputs)
                 loss = torch.nn.functional.cross_entropy(outputs, labels)
 
