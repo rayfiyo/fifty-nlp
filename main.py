@@ -140,7 +140,7 @@ def eval_model(
     with torch.no_grad(), (
         torch.cuda.amp.autocast()
         if device.startswith("cuda")
-        else torch.cpu.amp.autocast(dtype=torch.bfloat16)
+        else torch.cpu.amp.autocast()
     ):
         for inputs, true_y in loader:
             # GPU利用時は non_blocking=True で転送を非同期化できる
@@ -340,9 +340,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     )
 
     if device == "cpu":
-        model, optimizer = ipex.optimize(
-            model, optimizer=optimizer, dtype=torch.float, level="O1"
-        )
+        model, optimizer = ipex.optimize(model, optimizer=optimizer, level="O1")
         torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
     else:
         # GPU: IPEX不要
@@ -360,18 +358,11 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
         eta_min=eta_min,  # 最終学習率 (最小値)
     )
-
-    # CPU 用と GPU 用の autocast オブジェクトと引数を準備
-    if device == "cpu":
-        # CPU 時は bfloat16 演算を指定
-        Autocast = torch.cpu.amp.autocast
-        autocast_kwargs = {"dtype": torch.bfloat16}
-    else:
-        # GPU 時は float16 がデフォルト、引数なしで呼び出し
-        Autocast = torch.cuda.amp.autocast
-        autocast_kwargs = {}
+    Autocast = torch.cuda.amp.autocast
+    autocast_kwargs = {}
 
     # 学習ループ内の AMP
+    print()
     for epoch in range(epochs):
         # 学習モード
         model.train()
