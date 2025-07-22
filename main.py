@@ -40,7 +40,6 @@ from pathlib import Path
 from torchinfo import summary
 from torchview import draw_graph
 import datetime as _dt
-import os
 import subprocess
 import sys
 import yaml
@@ -54,7 +53,10 @@ run_type = config.get("type", "cnn")
 # ロギング周りの設定
 logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
 # import しているモジュールも出力されるので DEBUG は注意
-log_level = INFO  #  ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO  # ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# ランダムのシード値
+rng = np.random.default_rng(seed=42)
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -87,7 +89,7 @@ class MemmapDataset(Dataset):
     # idx 番目のサンプルを (Tensor, int) で返す
     def __getitem__(self, idx):
         # - x: 1D バイト系列 → long Tensor
-        x_tensor = torch.from_numpy(self.x[idx]).long()
+        x_tensor = torch.from_numpy(self.x[idx]).to(torch.uint8)
 
         # - y: 正解ラベル (int)
         y_scalar = int(self.y[idx])
@@ -257,7 +259,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 6. 小規模な開発用サブセットを使用
     if len(train_y) > n_subset:
-        rng = np.random.default_rng(seed=42)
         idx = rng.choice(len(train_y), size=n_subset, replace=False)
         # .copy() を末尾につけると RAM に複製される
         # つけないと memmap のままインデックスなので RAM 消費ゼロ
@@ -266,29 +267,20 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 7. DataLoader 生成
     pin_memory = device != "cpu"  # ピンメモリは GPU 時に有効化
-    if len(train_y) > n_subset:
-        subset_idx = np.random.default_rng(42).choice(
-            len(train_y), n_subset, replace=False
-        )
-        sampler = torch.utils.data.SubsetRandomSampler(subset_idx)
-    else:
-        sampler = None
+    train_dataset = MemmapDataset(train_x, train_y)  # 訓練データは学習中に混ぜるから
     train_dl = DataLoader(
-        MemmapDataset(train_x, train_y),
+        train_dataset,
         batch_size=batch_size,
-        shuffle=(sampler is None),  # データ順序をエポック毎にシャッフル
         pin_memory=pin_memory,
     )
     val_dl = DataLoader(
         MemmapDataset(val_x, val_y),
         batch_size=batch_size,
-        shuffle=False,
         pin_memory=pin_memory,
     )
     test_dl = DataLoader(
         MemmapDataset(test_x, test_y),
         batch_size=batch_size,
-        shuffle=False,
         pin_memory=pin_memory,
     )
 
@@ -339,12 +331,13 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     )
 
     if device == "cpu":
+        # CPU: IPEX による最適化（コンパイル含む）
         model, optimizer = ipex.optimize(model, optimizer=optimizer, level="O1")
         torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
     else:
         # GPU: IPEX不要
         torch.backends.cuda.matmul.allow_tf32 = True
-        # PyTorch 2.0 実行最適化
+        # PyTorch 2.0 による明示的なコンパイル
         model = torch.compile(model, mode="reduce-overhead")
 
     # 10. 学習のための値設定
@@ -360,6 +353,11 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 学習ループ内の AMP
     for epoch in range(epochs):
+        # 訓練 Dataset の内部データを並び替え（混ぜる）
+        perm = rng.permutation(len(train_dataset))
+        train_dataset.x = train_x[perm]
+        train_dataset.y = train_y[perm]
+
         # 学習モード
         model.train()
 
