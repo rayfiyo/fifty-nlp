@@ -54,7 +54,7 @@ run_type = config.get("type", "cnn")
 # ロギング周りの設定
 logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
 # import しているモジュールも出力されるので DEBUG は注意
-log_level = INFO #  ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
+log_level = INFO  #  ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -383,7 +383,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             # CPU／GPU に合わせて autocast を適用
             with amp.autocast(
                 device_type=("cuda" if device == "cuda" else "cpu"),
-                dtype=(None if device == "cuda" else torch.bfloat16),
             ):
                 outputs = model(inputs)
                 loss = torch.nn.functional.cross_entropy(outputs, labels)
