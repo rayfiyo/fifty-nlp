@@ -53,7 +53,8 @@ run_type = config.get("type", "cnn")
 
 # ロギング周りの設定
 logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが得られる
-logger.propagate = False  # ルートにバブリングさせない
+# import しているモジュールも出力されるので DEBUG は注意
+log_level = INFO #  ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -99,13 +100,14 @@ def configure_logging(run_dir: Path) -> None:
     ルートロガーを指定し、標準出力とファイル出力に同じフォーマットで出力する（二重化）。
     一部を標準出力にし、他はデフォルトの標準エラーに出したい場合は、フィルタなどが必要。
     """
-    # 1. ログレベルの設定: DEBUG, INFO, WARNING, ERROR, CRITICAL がある
-    # import しているモジュールも出力されるので DEBUG は注意
-    log_level = INFO
 
-    # 2. ルートロガーを log_level 以上にする
+    # 1. ルートロガーを log_level 以上にする
     root_logger = getLogger()
     root_logger.setLevel(log_level)
+
+    # 2. 既存のハンドラを削除
+    if root_logger.hasHandlers():
+        root_logger.handlers.clear()
 
     # 3. フォーマッタ定義
     fmt = "%(asctime)s %(name)s %(levelname)s: %(message)s"
