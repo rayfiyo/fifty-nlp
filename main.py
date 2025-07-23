@@ -328,23 +328,20 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         eta_min=eta_min,  # 最終学習率 (最小値)
     )
     for epoch in range(epochs):
-        # 訓練 Dataset の内部データを並び替え（混ぜる）
+        # 訓練 Dataset の内部データをシャッフル（混ぜる）
         perm = rng.permutation(len(train_y))
-        train_x = train_x[perm]
-        train_y = train_y[perm]
 
         # 学習モード
         model.train()
 
         # バッチループ
         for batch_idx in range(total_batches):
-            # 1. バッチ取り出し（memmap → Tensor、入力テンソルとラベルの作成）
+            # 1. インデックス経由でバッチ取得
             start = batch_idx * batch_size
-            slab = train_x[start : start + batch_size].astype(np.uint8)
+            idx = perm[start : start + batch_size]
+            slab = train_x[idx].astype(np.uint8)
             inputs = torch.from_numpy(slab).long().to(device)
-            labels = (
-                torch.from_numpy(train_y[start : start + batch_size]).long().to(device)
-            )
+            labels = torch.from_numpy(train_y[idx]).long().to(device)
 
             # 2. 勾配初期化
             optimizer.zero_grad()
