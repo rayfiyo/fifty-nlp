@@ -347,12 +347,13 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             optimizer.zero_grad()
 
             # 3. 自動混合精度 (AMP) での損失計算
-            # CPU／GPU に合わせて autocast を適用
-            with amp.autocast(
-                device_type=("cuda" if device == "cuda" else "cpu"),
-            ):
+            if device == "cuda":
+                # GPU なら autocast を利用
+                with amp.autocast(device_type="cuda"):
+                    outputs = model(inputs)
+            else:
                 outputs = model(inputs)
-                loss = torch.nn.functional.cross_entropy(outputs, labels)
+            loss = torch.nn.functional.cross_entropy(outputs, labels)
 
             # 4. 後処理
             loss.backward()  # 逆伝播（勾配計算）
