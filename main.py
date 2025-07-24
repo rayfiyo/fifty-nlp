@@ -24,7 +24,7 @@ from torch import amp
 import intel_extension_for_pytorch as ipex
 import numpy as np
 import torch
-import torch.nn as nn
+import torch.nn
 
 # ログなどの表示調整に関与
 from logging import (
@@ -138,16 +138,11 @@ def eval_model(
         total_batches = min(total_batches, max_batches)
 
     # 推論ループ
-    with torch.no_grad(), (
-        torch.cuda.amp.autocast()
-        if device.startswith("cuda")
-        else torch.cpu.amp.autocast()
-    ):
+    with torch.no_grad():
         for batch_idx in range(total_batches):
             start = batch_idx * batch_size
             slab = x_memmap[start : start + batch_size].astype(np.uint8)
-            inputs = torch.from_numpy(slab).long().to(device)
-            logits = model(inputs)
+            logits = model(torch.from_numpy(slab).long().to(device))
             pred_np = torch.argmax(logits, dim=1).cpu().numpy()
 
             true_np = y_memmap[start : start + batch_size]
@@ -155,12 +150,12 @@ def eval_model(
             total += true_np.shape[0]
 
     # ストリーミング集計した正解率を返す
-    accuracy = float(correct) / total if total > 0 else 0.0
+    accuracy = float(correct) / float(total) if total > 0 else 0.0
     return accuracy, total_batches, total
 
 
 def save_model_visuals(
-    model: nn.Module,
+    model: torch.nn.Module,
     run_dir: Path,
     input_length: int,
     batch_size: int,
