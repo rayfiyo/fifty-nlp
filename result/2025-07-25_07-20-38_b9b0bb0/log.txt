@@ -1,0 +1,55 @@
+2025-07-25 07:20:38 __main__ INFO: batch_size: 128
+2025-07-25 07:20:38 __main__ INFO: epochs: 30
+2025-07-25 07:20:38 __main__ INFO: lr: 0.0005
+2025-07-25 07:20:38 __main__ INFO: n_classes: 75
+2025-07-25 07:20:38 __main__ INFO: n_subset: 6144
+2025-07-25 07:20:38 __main__ INFO: eta_min: 1e-05
+2025-07-25 07:22:52 __main__ INFO: Epoch 1:progress 0% (batch 1/48)
+2025-07-25 07:27:28 __main__ INFO: Epoch 1:progress 8% (batch 5/48)
+2025-07-25 07:32:04 __main__ INFO: Epoch 1:progress 16% (batch 9/48)
+2025-07-25 07:36:36 __main__ INFO: Epoch 1:progress 25% (batch 13/48)
+2025-07-25 07:41:12 __main__ INFO: Epoch 1:progress 33% (batch 17/48)
+2025-07-25 07:45:51 __main__ INFO: Epoch 1:progress 41% (batch 21/48)
+2025-07-25 07:50:45 __main__ INFO: Epoch 1:progress 50% (batch 25/48)
+2025-07-25 07:55:40 __main__ INFO: Epoch 1:progress 58% (batch 29/48)
+2025-07-25 07:59:57 __main__ INFO: Epoch 1:progress 66% (batch 33/48)
+2025-07-25 08:04:28 __main__ INFO: Epoch 1:progress 75% (batch 37/48)
+2025-07-25 08:08:34 __main__ INFO: Epoch 1:progress 83% (batch 41/48)
+2025-07-25 08:12:13 __main__ INFO: Epoch 1:progress 91% (batch 45/48)
+2025-07-25 08:26:27 __main__ INFO: Epoch 1: Validation: batches=300, samples=38400, acc=0.076
+2025-07-25 08:26:27 __main__ INFO: Epoch 1: done!
+2025-07-25 09:11:26 __main__ INFO: Epoch 2: done!
+2025-07-25 09:31:52 __main__ INFO: Epoch 3: done!
+2025-07-25 09:40:53 __main__ INFO: Epoch 4: done!
+2025-07-25 09:48:47 __main__ INFO: Epoch 5: done!
+2025-07-25 10:08:11 __main__ INFO: Epoch 6: Validation: batches=300, samples=38400, acc=0.188
+2025-07-25 10:08:11 __main__ INFO: Epoch 6: done!
+2025-07-25 10:15:46 __main__ INFO: Epoch 7: done!
+2025-07-25 10:23:32 __main__ INFO: Epoch 8: done!
+2025-07-25 10:31:05 __main__ INFO: Epoch 9: done!
+2025-07-25 10:38:37 __main__ INFO: Epoch 10: done!
+2025-07-25 10:46:11 __main__ INFO: Epoch 11: done!
+2025-07-25 11:06:05 __main__ INFO: Epoch 12: Validation: batches=300, samples=38400, acc=0.281
+2025-07-25 11:06:05 __main__ INFO: Epoch 12: done!
+2025-07-25 11:14:46 __main__ INFO: Epoch 13: done!
+2025-07-25 11:22:07 __main__ INFO: Epoch 14: done!
+2025-07-25 11:29:26 __main__ INFO: Epoch 15: done!
+2025-07-25 11:36:42 __main__ INFO: Epoch 16: done!
+2025-07-25 11:43:50 __main__ INFO: Epoch 17: done!
+2025-07-25 12:01:33 __main__ INFO: Epoch 18: Validation: batches=300, samples=38400, acc=0.310
+2025-07-25 12:01:33 __main__ INFO: Epoch 18: done!
+2025-07-25 12:08:13 __main__ INFO: Epoch 19: done!
+2025-07-25 12:15:05 __main__ INFO: Epoch 20: done!
+2025-07-25 12:22:13 __main__ INFO: Epoch 21: done!
+2025-07-25 12:29:18 __main__ INFO: Epoch 22: done!
+2025-07-25 12:36:28 __main__ INFO: Epoch 23: done!
+2025-07-25 12:54:08 __main__ INFO: Epoch 24: Validation: batches=300, samples=38400, acc=0.320
+2025-07-25 12:54:08 __main__ INFO: Epoch 24: done!
+2025-07-25 13:00:39 __main__ INFO: Epoch 25: done!
+2025-07-25 13:07:09 __main__ INFO: Epoch 26: done!
+2025-07-25 13:13:36 __main__ INFO: Epoch 27: done!
+2025-07-25 13:20:09 __main__ INFO: Epoch 28: done!
+2025-07-25 13:26:37 __main__ INFO: Epoch 29: done!
+2025-07-25 13:43:07 __main__ INFO: Epoch 30: Validation: batches=300, samples=38400, acc=0.321
+2025-07-25 13:43:07 __main__ INFO: Epoch 30: done!
+2025-07-25 16:56:36 __main__ INFO: Full test accuracy: 0.322 (batches=6000, samples=768000)
