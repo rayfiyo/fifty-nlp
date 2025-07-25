@@ -68,7 +68,7 @@ training: # 学習設定（典型的なステップ順）
     batch_size: 128
     epochs: 30
     lr: 0.0005
-    n_subset: 6144
+    n_subset: 614400
     eta_min: 1.0e-5
 
 output:
