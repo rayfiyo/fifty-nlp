@@ -9,11 +9,31 @@ import torch
 import torch.nn as nn
 
 
-class FiFTyGRUModel(nn.Module):
-    """FiFTy 派生 GRU モデル（固定長 512byte）
+def init_keras_like_(m: nn.Module) -> None:
+    """
+    FiFTy で使用している Keras 既定に合わせた初期化:
+      - Conv1d/Dense: glorot_uniform (Xavier uniform), bias zeros
+      - Embedding: uniform(-0.05, 0.05)
+    """
+    if isinstance(m, nn.Embedding):
+        nn.init.uniform_(m.weight, a=-0.05, b=0.05)
 
-    - 構造: Embedding → (多層)Bi‑GRU → Dropout → 全結合
-    - GRU は LSTM よりパラメータと計算量が約 25 % 少なく高速
+    elif isinstance(m, nn.Conv1d):
+        nn.init.xavier_uniform_(m.weight)  # glorot_uniform
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+
+    elif isinstance(m, nn.Linear):
+        nn.init.xavier_uniform_(m.weight)  # glorot_uniform
+        if m.bias is not None:
+            nn.init.zeros_(m.bias)
+
+
+class FiFTyGRUModel(nn.Module):
+    """
+    FiFTy 派生 GRU モデル（固定長 512byte）
+      - 構造: Embedding → (多層)Bi‑GRU → Dropout → 全結合
+      - GRU は LSTM よりパラメータと計算量が約 25 % 少なく高速
     """
 
     def __init__(
@@ -111,9 +131,6 @@ class FiFTyLSTMModel(nn.Module):
         # 5. 全結合: (B, fc_in) → (B, n_classes)
         self.fc = nn.Linear(fc_in, n_classes)
 
-        # [NOTE] Softmax は損失計算 (nn.CrossEntropyLoss) 側で内部的に適用済みのため不要
-        # [NOTE] 推論で確率が必要な場合のみ model.softmax(logits) などとする
-
     # 順伝播
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # noqa: D401
         """
@@ -158,9 +175,6 @@ class FiFTyModel(nn.Module):
     ) -> None:
         super().__init__()
 
-        # 出力確率化用 Softmax
-        self.softmax = nn.Softmax(dim=1)
-
         # バイト（0〜255）を embed_dim 次元へ変換（埋め込み）
         self.embed = nn.Embedding(256, embed_dim)
 
@@ -173,13 +187,8 @@ class FiFTyModel(nn.Module):
                 conv_channels,
                 kernel_size,
                 stride=1,  # FiFTy はstride 1 前提の設計
-                padding=kernel_size // 2,  # カーネル幅を半分ずつ前後に埋めるパディング
+                padding=0,  # FiFTy の Keras 既定の padding="valid" に合わせる
             )
-            # 重み初期化の明示: FiFTy は Keras なので He(Kaiming) 初期化をしている
-            nn.init.kaiming_normal_(conv.weight, nonlinearity="leaky_relu")
-            if conv.bias is not None:
-                nn.init.zeros_(conv.bias)
-
             self.blocks.append(conv)
             in_channels = conv_channels
 
@@ -198,14 +207,13 @@ class FiFTyModel(nn.Module):
         # 全結合層: 入力チャネル数（今回は畳み込みブロック後のチャネル数 conv_channels）を
         # hidden 次元の特徴ベクトルに写像する全結合層
         self.fc1 = nn.Linear(conv_channels, hidden)
-        nn.init.kaiming_normal_(self.fc1.weight, a=0.3, nonlinearity="leaky_relu")
-        nn.init.zeros_(self.fc1.bias)
 
         # 出力層: hidden 次元ベクトルを最終的に
         #         n_classes クラス分のロジット（未正規化確率）に写像する全結合層
         self.fc2 = nn.Linear(hidden, n_classes)
-        nn.init.kaiming_normal_(self.fc2.weight, a=0.3, nonlinearity="leaky_relu")
-        nn.init.zeros_(self.fc2.bias)
+
+        # まとめて Keras 既定に近い初期化を適用
+        self.apply(init_keras_like_)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """順伝播処理 (B, T) → (B, C)"""

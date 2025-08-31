@@ -2,6 +2,11 @@
 
 type: "gru" # モデルの種類: cnn / lstm / gru
 
+experiment:
+  seed: 42
+  device: "cpu" # cpu / gpu / cuda が利用可能だが、cpu 以外は未整備
+  result_dir: "result"
+
 data: # データセットのパス周り
   base_dir: "~/dataset/"
   splits: ["train", "val", "test"]
@@ -46,7 +51,8 @@ training: # 学習設定（典型的なステップ順）
   # batch_size: バッチサイズ: １ステップでネットワークに入力して処理するサンプル数
   # epochs:     エポック数:   全データセットを何周学習するか。過学習注意
   # lr:         学習率:       モデルパラメータ更新時の学習の速さ。大: 発散、小: 遅収束
-  # n_subset:         サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
+  # n_subset:   サブセットサイズ: 学習データのサンプル数を制限する。最大 6144000
+  # eta_min:    最小学習率: 学習率スケジューラ CosineAnnealingLR の最小値
   # ---
   # マルチプロセス読込は memmap と相性が悪いので num_workers などは設定しない
 
@@ -54,22 +60,19 @@ training: # 学習設定（典型的なステップ順）
     batch_size: 128
     epochs: 30
     lr: 0.001
-    n_subset: 614
-    eta_min: 1.0e-5
+    n_subset: 61440 # 1%
+    eta_min: 1.0e-7
 
   lstm:
     batch_size: 128
     epochs: 30
     lr: 0.0005
-    n_subset: 61440
-    eta_min: 1.0e-5
+    n_subset: 61440 # 1%
+    eta_min: 1.0e-7
 
   gru:
     batch_size: 128
     epochs: 30
     lr: 0.0005
     n_subset: 614400
-    eta_min: 1.0e-5
-
-output:
-  result_dir: "result"
+    eta_min: 1.0e-7

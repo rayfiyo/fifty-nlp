@@ -23,6 +23,7 @@ from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel
 from torch import amp
 import intel_extension_for_pytorch as ipex
 import numpy as np
+import random
 import torch
 import torch.nn
 
@@ -54,8 +55,15 @@ logger = getLogger(__name__)  # __name__: 個別モジュール用ロガーが�
 # import しているモジュールも出力されるので DEBUG は注意
 log_level = INFO  # ログレベル: DEBUG, INFO, WARNING, ERROR, CRITICAL
 
-# ランダムのシード値
-rng = np.random.default_rng(seed=42)
+
+def set_seed(seed=42):
+    """
+    乱数シードを固定し、実験の再現性を確保する関数
+    """
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -112,7 +120,6 @@ def eval_model(
     device: str = "cpu",
     *,
     max_batches: int | None = None,
-    subset_ratio: float | None = None,
 ) -> tuple[float, int, int]:
     """
     評価用関数：モデルを評価モードに切り替え、
@@ -120,17 +127,10 @@ def eval_model(
 
     - memmap を丸ごとスライス → 一度のバッチ Tensor 化
     - GPU/CUDA 時は autocast、CPU でも autocast（PyTorch 2.0+）を利用可能
-    - subset_ratio で評価データ縮小、max_batches でバッチ数制限
     """
     model.eval()
     correct = 0
     total = 0
-
-    # subset_ratio があれば先に切り出し
-    if subset_ratio is not None:
-        N = int(len(y_memmap) * subset_ratio)
-        x_memmap = x_memmap[:N]
-        y_memmap = y_memmap[:N]
 
     # 総バッチ数を算出し，max_batches で制限
     total_batches = ceil(len(y_memmap) / batch_size)
@@ -140,11 +140,13 @@ def eval_model(
     # 推論ループ
     with torch.no_grad():
         for batch_idx in range(total_batches):
+            # 入力データのバッチを作成
             start = batch_idx * batch_size
             slab = x_memmap[start : start + batch_size].astype(np.uint8)
             logits = model(torch.from_numpy(slab).long().to(device))
-            pred_np = torch.argmax(logits, dim=1).cpu().numpy()
 
+            # バッチごとに正解数を加算（ストリーミング）
+            pred_np = torch.argmax(logits, dim=1).cpu().numpy()
             true_np = y_memmap[start : start + batch_size]
             correct += (pred_np == true_np).sum()
             total += true_np.shape[0]
@@ -194,6 +196,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     - 評価
     - 可視化ファイル保存とログ出力
     """
+    seed = config["experiment"]["seed"]
+    set_seed(seed)
 
     # 1. タグのデフォルト値として直近コミットの先頭7桁を取得
     try:
@@ -212,7 +216,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     tag = sys.argv[1] if len(sys.argv) > 1 else default_tag
 
-    run_dir = PWD / Path(config["output"]["result_dir"]) / f"{ts}_{tag}"
+    run_dir = PWD / Path(config["experiment"]["result_dir"]) / f"{ts}_{tag}"
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # 3. ログ二重化
@@ -245,16 +249,21 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     n_subset = tcfg["n_subset"]
     logger.info(f"n_subset: {n_subset}")
     #
-    eta_min = tcfg.get("eta_min", 1e-5)
+    eta_min = tcfg.get("eta_min", 1e-7)
     logger.info(f"eta_min: {eta_min}")
 
     # 6. 小規模な開発用サブセットを使用
-    if len(train_y) > n_subset:
+    n_subset = config["training"]["n_subset"]
+    logger.info(f"n_subset: {n_subset}")
+    if n_subset and (n_subset < len(train_y)):
+        rng = np.random.default_rng(seed=seed)
         idx = rng.choice(len(train_y), size=n_subset, replace=False)
         # .copy() を末尾につけると RAM に複製される
-        # つけないと memmap のままインデックスなので RAM 消費ゼロ
+        # つけないと memmap のままで RAM 消費ゼロ
         train_x = train_x[idx]
         train_y = train_y[idx]
+    else:
+        pass  # フルデータを memmap のまま利用、n_subset = 0 用
 
     # 7. モデル構築
     if run_type == "gru":
@@ -291,6 +300,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         model.parameters(),
         lr=lr,
         betas=(0.9, 0.999),
+        eps=1e-7,  # Keras 既定
+        amsgrad=False,  # Keras 既定
     )
 
     # 8. モデルの最適化
@@ -313,8 +324,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         model = torch.compile(model, mode="reduce-overhead")
 
     # 9. 学習のための値設定
-    total_batches = ceil(len(train_y) / batch_size)  # 総バッチ数（切り上げ）
-    progress_step = max(1, total_batches // 10)  # 10% ごとに進捗表示
+    total_batches = ceil(len(train_y) / batch_size)  # １エポックあたりの総ステップ数
+    progress_step = max(1, total_batches // 10)  # 学習進捗 10% 毎の表示用
 
     # 10. 学習ループ
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
@@ -323,19 +334,19 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         eta_min=eta_min,  # 最終学習率 (最小値)
     )
     for epoch in range(epochs):
-        # 訓練 Dataset の内部データをシャッフル（混ぜる）
-        perm = rng.permutation(len(train_y))
-
         # 学習モード
         model.train()
+
+        # 各エポックのシャッフル順を作成（再現性のために epoch 固有シード）
+        rng = np.random.default_rng(seed=seed + epoch)
+        order = rng.permutation(len(train_y))  # int64 配列（約 49MB @ 6,144,000 件）
 
         # バッチループ
         for batch_idx in range(total_batches):
             # 1. インデックス経由でバッチ取得
             start = batch_idx * batch_size
-            idx = perm[start : start + batch_size]
-            slab = train_x[idx].astype(np.uint8)
-            inputs = torch.from_numpy(slab).long().to(device)
+            idx = order[start : start + batch_size]
+            inputs = torch.from_numpy(train_x[idx].astype(np.uint8)).long().to(device)
             labels = torch.from_numpy(train_y[idx]).long().to(device)
 
             # 2. 勾配初期化
@@ -369,7 +380,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         scheduler.step()
 
         # 検証精度の評価（スモークテスト用バリデーション）
-        if epoch == 0 or (epoch + 1) % 6 == 0:
+        if epoch == 0 or (epoch + 1) % 12 == 0:
             val_acc, val_batches, val_samples = eval_model(
                 model, val_x, val_y, batch_size, device, max_batches=300
             )
@@ -392,7 +403,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
 
 if __name__ == "__main__":
-    device_str = "cuda" if torch.cuda.is_available() else "cpu"
+    device_str = config["experiment"]["device"]
+    if device_str == "":
+        device_str = "cuda" if torch.cuda.is_available() else "cpu"
+
     try:
         main(device=device_str)
     except (Exception, MemoryError) as err:
