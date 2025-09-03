@@ -21,7 +21,6 @@ from __future__ import annotations
 # 機械学習に関与
 from models import FiFTyModel, FiFTyLSTMModel, FiFTyGRUModel
 from torch import amp
-import intel_extension_for_pytorch as ipex
 import numpy as np
 import random
 import torch
@@ -312,16 +311,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
         input_length=train_x.shape[1],
         batch_size=batch_size,
     )
-
-    if device == "cpu":
-        # CPU: IPEX による最適化（コンパイル含む）
-        model, optimizer = ipex.optimize(model, optimizer=optimizer, level="O1")
-        torch.set_float32_matmul_precision("medium")  # oneDNN 最適化
-    else:
-        # GPU: IPEX不要
-        torch.backends.cuda.matmul.allow_tf32 = True
-        # PyTorch 2.0 による明示的なコンパイル
-        model = torch.compile(model, mode="reduce-overhead")
+    # PyTorch 2.0 実行最適化
+    model = torch.compile(model, mode="reduce-overhead")
 
     # 9. 学習のための値設定
     total_batches = ceil(len(train_y) / batch_size)  # １エポックあたりの総ステップ数
