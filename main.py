@@ -252,7 +252,6 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     logger.info(f"eta_min: {eta_min}")
 
     # 6. 小規模な開発用サブセットを使用
-    n_subset = config["training"]["n_subset"]
     logger.info(f"n_subset: {n_subset}")
     if n_subset and (n_subset < len(train_y)):
         rng = np.random.default_rng(seed=seed)
