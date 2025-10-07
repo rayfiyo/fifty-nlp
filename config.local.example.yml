@@ -1,0 +1,11 @@
+# config.yml の上書き用テンプレート
+# Google Drive やローカル環境など、個人設定をここに記述
+
+experiment:
+  # Colab で Google Drive を使う場合のサンプル
+  # /content/drive/MyDrive にある任意の保存先に置き換えてください
+  result_dir: "/content/drive/MyDrive/fifty-nlp/result"
+
+data:
+  # データセット配置先。Drive 上に置いてマウントしておくと永続化できます
+  base_dir: "/content/drive/MyDrive/fifty-nlp/dataset/"

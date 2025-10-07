@@ -25,6 +25,7 @@ import numpy as np
 import random
 import torch
 import torch.nn
+import os
 
 # ログなどの表示調整に関与
 from logging import (
@@ -42,11 +43,58 @@ import datetime as _dt
 import subprocess
 import sys
 import yaml
+from collections.abc import MutableMapping
+from typing import Any
 
 
 # config.yml の読み込み設定
 PWD = Path(__file__).parent
-config = yaml.safe_load((PWD / "config.yml").read_text(encoding="utf-8"))
+LOCAL_CONFIG_NAME = "config.local.yml"
+
+
+def _deep_update(base: MutableMapping[str, Any], overrides: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+    """再帰的な dict マージ。上書き優先。"""
+
+    for key, value in overrides.items():
+        if (
+            isinstance(value, MutableMapping)
+            and key in base
+            and isinstance(base[key], MutableMapping)
+        ):
+            _deep_update(base[key], value)
+        else:
+            base[key] = value
+    return base
+
+
+def load_config() -> dict[str, Any]:
+    """config.yml を読み込み、config.local.yml と環境変数で上書き。"""
+
+    default_path = PWD / "config.yml"
+    config_data = yaml.safe_load(default_path.read_text(encoding="utf-8")) or {}
+
+    local_path = PWD / LOCAL_CONFIG_NAME
+    if local_path.exists():
+        local_config = yaml.safe_load(local_path.read_text(encoding="utf-8")) or {}
+        if isinstance(local_config, MutableMapping):
+            _deep_update(config_data, local_config)
+
+    env_base_dir = os.environ.get("FIFTY_DATA_BASE_DIR")
+    if env_base_dir:
+        config_data.setdefault("data", {})["base_dir"] = env_base_dir
+
+    env_result_dir = os.environ.get("FIFTY_RESULT_DIR")
+    if env_result_dir:
+        config_data.setdefault("experiment", {})["result_dir"] = env_result_dir
+
+    env_run_type = os.environ.get("FIFTY_RUN_TYPE")
+    if env_run_type:
+        config_data["type"] = env_run_type
+
+    return config_data
+
+
+config = load_config()
 run_type = config.get("type", "cnn")
 
 # ロギング周りの設定
