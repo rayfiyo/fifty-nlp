@@ -52,7 +52,9 @@ PWD = Path(__file__).parent
 LOCAL_CONFIG_NAME = "config.local.yml"
 
 
-def _deep_update(base: MutableMapping[str, Any], overrides: MutableMapping[str, Any]) -> MutableMapping[str, Any]:
+def _deep_update(
+    base: MutableMapping[str, Any], overrides: MutableMapping[str, Any]
+) -> MutableMapping[str, Any]:
     """再帰的な dict マージ。上書き優先。"""
 
     for key, value in overrides.items():
@@ -71,11 +73,21 @@ def load_config() -> dict[str, Any]:
     """config.yml を読み込み、config.local.yml と環境変数で上書き。"""
 
     default_path = PWD / "config.yml"
-    config_data = yaml.safe_load(default_path.read_text(encoding="utf-8")) or {}
+    config_data = (
+        yaml.safe_load(
+            default_path.read_text(encoding="utf-8"),
+        )
+        or {}
+    )
 
     local_path = PWD / LOCAL_CONFIG_NAME
     if local_path.exists():
-        local_config = yaml.safe_load(local_path.read_text(encoding="utf-8")) or {}
+        local_config = (
+            yaml.safe_load(
+                local_path.read_text(encoding="utf-8"),
+            )
+            or {}
+        )
         if isinstance(local_config, MutableMapping):
             _deep_update(config_data, local_config)
 
@@ -384,7 +396,13 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             # 1. インデックス経由でバッチ取得
             start = batch_idx * batch_size
             idx = order[start : start + batch_size]
-            inputs = torch.from_numpy(train_x[idx].astype(np.uint8)).long().to(device)
+            inputs = (
+                torch.from_numpy(
+                    train_x[idx].astype(np.uint8),
+                )
+                .long()
+                .to(device)
+            )
             labels = torch.from_numpy(train_y[idx]).long().to(device)
 
             # 2. 勾配初期化
@@ -411,7 +429,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
                 percent = int(batch_idx / total_batches * 100)
                 logger.info(
                     f"Epoch {epoch + 1}:"
-                    + f"progress {percent}% (batch {batch_idx + 1}/{total_batches})"
+                    + f"progress {percent}% "
+                    + f"(batch {batch_idx + 1}/{total_batches})"
                 )
 
         # 学習率を 1 段階更新
@@ -424,7 +443,8 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             )
             logger.info(
                 f"Epoch {epoch + 1}: Validation:"
-                + f" batches={val_batches}, samples={val_samples}, acc={val_acc:.3f}"
+                + f" batches={val_batches}, "
+                + f"samples={val_samples}, acc={val_acc:.3f}"
             )
 
         # エポック終了のログ
