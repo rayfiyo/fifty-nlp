@@ -92,7 +92,8 @@ def set_seed(seed=42):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
 
 
 def load_memmap(split: str) -> tuple[np.memmap, np.memmap]:
@@ -141,12 +142,49 @@ def configure_logging(run_dir: Path) -> None:
     root_logger.addHandler(ch)
 
 
+def resolve_device(device_name: str | None) -> torch.device:
+    """
+    設定文字列から torch.device を解決する。
+
+    - 空文字列や None は自動判定
+    - "gpu" は "cuda" のエイリアス
+    - CUDA が要求されたが利用できない場合は例外
+    """
+
+    if device_name is None:
+        normalized = "auto"
+    else:
+        normalized = device_name.strip().lower()
+        if normalized == "":
+            normalized = "auto"
+
+    if normalized == "gpu":
+        normalized = "cuda"
+
+    if normalized == "auto":
+        normalized = "cuda" if torch.cuda.is_available() else "cpu"
+
+    try:
+        resolved = torch.device(normalized)
+    except (TypeError, ValueError, RuntimeError) as exc:  # pragma: no cover - 設定エラー
+        msg = f"Unsupported device specifier: {device_name!r}"
+        raise ValueError(msg) from exc
+
+    if resolved.type == "cuda" and not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA device requested but not available. "
+            "Enable a GPU runtime or set experiment.device to 'cpu'."
+        )
+
+    return resolved
+
+
 def eval_model(
     model: torch.nn.Module,
     x_memmap: np.memmap,
     y_memmap: np.memmap,
     batch_size: int,
-    device: str = "cpu",
+    device: torch.device,
     *,
     max_batches: int | None = None,
 ) -> tuple[float, int, int]:
@@ -172,7 +210,12 @@ def eval_model(
             # 入力データのバッチを作成
             start = batch_idx * batch_size
             slab = x_memmap[start : start + batch_size].astype(np.uint8)
-            logits = model(torch.from_numpy(slab).long().to(device))
+            inputs = torch.from_numpy(slab).long().to(device)
+            with amp.autocast(
+                device_type=device.type,
+                enabled=device.type == "cuda",
+            ):
+                logits = model(inputs)
 
             # バッチごとに正解数を加算（ストリーミング）
             pred_np = torch.argmax(logits, dim=1).cpu().numpy()
@@ -216,7 +259,7 @@ def save_model_visuals(
     (run_dir / "torchinfo.txt").write_text(str(info), encoding="utf-8")
 
 
-def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
+def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     """
     メイン関数:
     - データ読み込み
@@ -225,6 +268,9 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
     - 評価
     - 可視化ファイル保存とログ出力
     """
+    if not isinstance(device, torch.device):
+        device = resolve_device(str(device))
+
     seed = config["experiment"]["seed"]
     set_seed(seed)
 
@@ -250,6 +296,7 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
     # 3. ログ二重化
     configure_logging(run_dir)
+    logger.info(f"device: {device.type} ({device})")
 
     # 4. データ読み込み
     splits = config["data"]["splits"]
@@ -379,11 +426,10 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
             optimizer.zero_grad()
 
             # 3. 自動混合精度 (AMP) での損失計算
-            if device == "cuda":
-                # GPU なら autocast を利用
-                with amp.autocast(device_type="cuda"):
-                    outputs = model(inputs)
-            else:
+            with amp.autocast(
+                device_type=device.type,
+                enabled=device.type == "cuda",
+            ):
                 outputs = model(inputs)
             loss = torch.nn.functional.cross_entropy(outputs, labels)
 
@@ -431,12 +477,15 @@ def main(device: str = "cpu") -> None:  # noqa: C901 (関数長は許容)
 
 
 if __name__ == "__main__":
-    device_str = config["experiment"]["device"]
-    if device_str == "":
-        device_str = "cuda" if torch.cuda.is_available() else "cpu"
+    device_spec = config.get("experiment", {}).get("device")
+    try:
+        resolved_device = resolve_device(device_spec)
+    except (Exception, MemoryError) as err:
+        logger.error(f"Device resolution failed: {err}", exc_info=True)
+        sys.exit(1)
 
     try:
-        main(device=device_str)
+        main(device=resolved_device)
     except (Exception, MemoryError) as err:
         # Python MemoryError / RuntimeError: CUDA OOM などもここでキャッチ
         logger.error(f"Fatal error occurred: {err}", exc_info=True)

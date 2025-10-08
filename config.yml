@@ -4,7 +4,7 @@ type: "gru" # モデルの種類: cnn / lstm / gru
 
 experiment:
   seed: 42
-  device: "cpu" # cpu / gpu / cuda が利用可能だが、cpu 以外は未整備
+  device: "gpu" # cpu / gpu / auto が指定可能（gpu は cuda と同義）
   # result_dir: "result" # ローカルの場合
 
   # /content/drive/MyDrive にある任意の保存先に置き換えること
