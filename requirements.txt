@@ -1,7 +1,5 @@
-intel_extension_for_pytorch==2.7.0
-numpy==2.3.1
+numpy==1.26.4
 PyYAML==6.0.2
-PyYAML==6.0.2
-torch==2.7.1
+torch==2.8.0
 torchinfo==1.8.0
 torchview==0.2.7
