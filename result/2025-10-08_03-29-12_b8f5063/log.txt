@@ -1,0 +1,50 @@
+2025-10-08 03:29:12 __main__ INFO: device: cuda (cuda)
+2025-10-08 03:29:12 __main__ INFO: run_dir: /content/drive/MyDrive/fifty-nlp/result/2025-10-08_03-29-12_b8f5063
+2025-10-08 03:29:13 __main__ INFO: batch_size: 128
+2025-10-08 03:29:13 __main__ INFO: epochs: 30
+2025-10-08 03:29:13 __main__ INFO: lr: 0.0005
+2025-10-08 03:29:13 __main__ INFO: n_classes: 75
+2025-10-08 03:29:13 __main__ INFO: n_subset: 6144000
+2025-10-08 03:29:13 __main__ INFO: eta_min: 1e-07
+2025-10-08 03:29:13 __main__ INFO: n_subset: 6144000
+2025-10-08 03:29:21 __main__ INFO: Epoch 1:progress 0% (batch 1/48000)
+2025-10-08 03:35:45 __main__ INFO: Epoch 1:progress 10% (batch 4801/48000)
+2025-10-08 03:42:04 __main__ INFO: Epoch 1:progress 20% (batch 9601/48000)
+2025-10-08 03:48:23 __main__ INFO: Epoch 1:progress 30% (batch 14401/48000)
+2025-10-08 03:54:41 __main__ INFO: Epoch 1:progress 40% (batch 19201/48000)
+2025-10-08 04:01:00 __main__ INFO: Epoch 1:progress 50% (batch 24001/48000)
+2025-10-08 04:07:18 __main__ INFO: Epoch 1:progress 60% (batch 28801/48000)
+2025-10-08 04:13:37 __main__ INFO: Epoch 1:progress 70% (batch 33601/48000)
+2025-10-08 04:19:55 __main__ INFO: Epoch 1:progress 80% (batch 38401/48000)
+2025-10-08 04:26:13 __main__ INFO: Epoch 1:progress 90% (batch 43201/48000)
+2025-10-08 04:32:39 __main__ INFO: Epoch 1: Validation: batches=300, samples=38400, acc=0.657
+2025-10-08 04:32:39 __main__ INFO: Epoch 1: done!
+2025-10-08 04:32:39 __main__ INFO: Epoch 1: checkpoint saved
+2025-10-08 05:35:27 __main__ INFO: Epoch 2: done!
+2025-10-08 05:35:28 __main__ INFO: Epoch 2: checkpoint saved
+2025-10-08 06:08:40 __main__ INFO: device: cuda (cuda)
+2025-10-08 06:08:40 __main__ INFO: run_dir: /content/drive/MyDrive/fifty-nlp/result/2025-10-08_03-29-12_b8f5063
+2025-10-08 06:08:40 __main__ INFO: resume_checkpoint: /content/drive/MyDrive/fifty-nlp/result/2025-10-08_03-29-12_b8f5063/checkpoint_latest.pt
+2025-10-08 06:08:42 __main__ INFO: Resuming from epoch 2 (checkpoint saved at 2025-10-08T05:35:27)
+2025-10-08 06:08:46 __main__ INFO: batch_size: 128
+2025-10-08 06:08:46 __main__ INFO: epochs: 30
+2025-10-08 06:08:46 __main__ INFO: lr: 0.0005
+2025-10-08 06:08:46 __main__ INFO: n_classes: 75
+2025-10-08 06:08:46 __main__ INFO: n_subset: 6144000
+2025-10-08 06:08:46 __main__ INFO: eta_min: 1e-07
+2025-10-08 06:08:46 __main__ INFO: n_subset: 6144000
+2025-10-08 06:08:51 __main__ ERROR: Fatal error occurred: Error(s) in loading state_dict for FiFTyGRUModel:
+	Missing key(s) in state_dict: "embed.weight", "gru.weight_ih_l0", "gru.weight_hh_l0", "gru.bias_ih_l0", "gru.bias_hh_l0", "gru.weight_ih_l0_reverse", "gru.weight_hh_l0_reverse", "gru.bias_ih_l0_reverse", "gru.bias_hh_l0_reverse", "gru.weight_ih_l1", "gru.weight_hh_l1", "gru.bias_ih_l1", "gru.bias_hh_l1", "gru.weight_ih_l1_reverse", "gru.weight_hh_l1_reverse", "gru.bias_ih_l1_reverse", "gru.bias_hh_l1_reverse", "fc.weight", "fc.bias". 
+	Unexpected key(s) in state_dict: "_orig_mod.embed.weight", "_orig_mod.gru.weight_ih_l0", "_orig_mod.gru.weight_hh_l0", "_orig_mod.gru.bias_ih_l0", "_orig_mod.gru.bias_hh_l0", "_orig_mod.gru.weight_ih_l0_reverse", "_orig_mod.gru.weight_hh_l0_reverse", "_orig_mod.gru.bias_ih_l0_reverse", "_orig_mod.gru.bias_hh_l0_reverse", "_orig_mod.gru.weight_ih_l1", "_orig_mod.gru.weight_hh_l1", "_orig_mod.gru.bias_ih_l1", "_orig_mod.gru.bias_hh_l1", "_orig_mod.gru.weight_ih_l1_reverse", "_orig_mod.gru.weight_hh_l1_reverse", "_orig_mod.gru.bias_ih_l1_reverse", "_orig_mod.gru.bias_hh_l1_reverse", "_orig_mod.fc.weight", "_orig_mod.fc.bias". 
+Traceback (most recent call last):
+  File "/content/fifty-nlp/main.py", line 633, in <module>
+    main(device=resolved_device)
+  File "/content/fifty-nlp/main.py", line 502, in main
+    load_checkpoint(
+  File "/content/fifty-nlp/main.py", line 283, in load_checkpoint
+    model.load_state_dict(checkpoint["model_state"], strict=True)
+  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 2593, in load_state_dict
+    raise RuntimeError(
+RuntimeError: Error(s) in loading state_dict for FiFTyGRUModel:
+	Missing key(s) in state_dict: "embed.weight", "gru.weight_ih_l0", "gru.weight_hh_l0", "gru.bias_ih_l0", "gru.bias_hh_l0", "gru.weight_ih_l0_reverse", "gru.weight_hh_l0_reverse", "gru.bias_ih_l0_reverse", "gru.bias_hh_l0_reverse", "gru.weight_ih_l1", "gru.weight_hh_l1", "gru.bias_ih_l1", "gru.bias_hh_l1", "gru.weight_ih_l1_reverse", "gru.weight_hh_l1_reverse", "gru.bias_ih_l1_reverse", "gru.bias_hh_l1_reverse", "fc.weight", "fc.bias". 
+	Unexpected key(s) in state_dict: "_orig_mod.embed.weight", "_orig_mod.gru.weight_ih_l0", "_orig_mod.gru.weight_hh_l0", "_orig_mod.gru.bias_ih_l0", "_orig_mod.gru.bias_hh_l0", "_orig_mod.gru.weight_ih_l0_reverse", "_orig_mod.gru.weight_hh_l0_reverse", "_orig_mod.gru.bias_ih_l0_reverse", "_orig_mod.gru.bias_hh_l0_reverse", "_orig_mod.gru.weight_ih_l1", "_orig_mod.gru.weight_hh_l1", "_orig_mod.gru.bias_ih_l1", "_orig_mod.gru.bias_hh_l1", "_orig_mod.gru.weight_ih_l1_reverse", "_orig_mod.gru.weight_hh_l1_reverse", "_orig_mod.gru.bias_ih_l1_reverse", "_orig_mod.gru.bias_hh_l1_reverse", "_orig_mod.fc.weight", "_orig_mod.fc.bias". 

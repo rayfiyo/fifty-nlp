@@ -1,0 +1,10 @@
+2025-10-08 02:47:39 __main__ INFO: device: cuda (cuda)
+2025-10-08 02:47:43 __main__ INFO: batch_size: 128
+2025-10-08 02:47:43 __main__ INFO: epochs: 30
+2025-10-08 02:47:43 __main__ INFO: lr: 0.0005
+2025-10-08 02:47:43 __main__ INFO: n_classes: 75
+2025-10-08 02:47:43 __main__ INFO: n_subset: 6144000
+2025-10-08 02:47:43 __main__ INFO: eta_min: 1e-07
+2025-10-08 02:47:43 __main__ INFO: n_subset: 6144000
+2025-10-08 02:47:49 __main__ INFO: [GPU CHECK] Model moved to: cuda:0
+2025-10-08 02:48:22 __main__ INFO: Epoch 1:progress 0% (batch 1/48000)

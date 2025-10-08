@@ -1,0 +1,7 @@
+2025-10-08 01:55:14 __main__ INFO: batch_size: 128
+2025-10-08 01:55:14 __main__ INFO: epochs: 30
+2025-10-08 01:55:14 __main__ INFO: lr: 0.0005
+2025-10-08 01:55:14 __main__ INFO: n_classes: 75
+2025-10-08 01:55:14 __main__ INFO: n_subset: 6144000
+2025-10-08 01:55:14 __main__ INFO: eta_min: 1e-07
+2025-10-08 01:55:14 __main__ INFO: n_subset: 6144000
