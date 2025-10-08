@@ -5,11 +5,17 @@ type: "gru" # モデルの種類: cnn / lstm / gru
 experiment:
   seed: 42
   device: "cpu" # cpu / gpu / cuda が利用可能だが、cpu 以外は未整備
-  result_dir: "result"
+  # result_dir: "result" # ローカルの場合
+
+  # /content/drive/MyDrive にある任意の保存先に置き換えること
+  result_dir: "/content/drive/MyDrive/fifty-nlp/result" # Colab で Google Drive を使う場合
 
 data: # データセットのパス周り
-  base_dir: "~/dataset/"
   splits: ["train", "val", "test"]
+  # base_dir: "~/dataset/" # ローカルの場合
+
+  # Drive 上に置いてマウントしておくと永続化できる
+  base_dir: "/content/drive/MyDrive/fifty-nlp/dataset/"
 
 model: # モデル構造（__init__→forward でデータが流れる順番）
   # embed_dim:      埋め込み次元数:           バイト値をベクトル化する際の出力次元数

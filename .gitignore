@@ -191,7 +191,3 @@ nohup.out
 !log.txt
 !torchinfo.txt
 !torchview.svg
-
-#
-
-config.local.yml

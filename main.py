@@ -43,34 +43,15 @@ import datetime as _dt
 import subprocess
 import sys
 import yaml
-from collections.abc import MutableMapping
 from typing import Any
 
 
 # config.yml の読み込み設定
 PWD = Path(__file__).parent
-LOCAL_CONFIG_NAME = "config.local.yml"
-
-
-def _deep_update(
-    base: MutableMapping[str, Any], overrides: MutableMapping[str, Any]
-) -> MutableMapping[str, Any]:
-    """再帰的な dict マージ。上書き優先。"""
-
-    for key, value in overrides.items():
-        if (
-            isinstance(value, MutableMapping)
-            and key in base
-            and isinstance(base[key], MutableMapping)
-        ):
-            _deep_update(base[key], value)
-        else:
-            base[key] = value
-    return base
 
 
 def load_config() -> dict[str, Any]:
-    """config.yml を読み込み、config.local.yml と環境変数で上書き。"""
+    """config.yml を読み込み、環境変数で上書き。"""
 
     default_path = PWD / "config.yml"
     config_data = (
@@ -79,17 +60,6 @@ def load_config() -> dict[str, Any]:
         )
         or {}
     )
-
-    local_path = PWD / LOCAL_CONFIG_NAME
-    if local_path.exists():
-        local_config = (
-            yaml.safe_load(
-                local_path.read_text(encoding="utf-8"),
-            )
-            or {}
-        )
-        if isinstance(local_config, MutableMapping):
-            _deep_update(config_data, local_config)
 
     env_base_dir = os.environ.get("FIFTY_DATA_BASE_DIR")
     if env_base_dir:
