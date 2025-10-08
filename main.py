@@ -166,7 +166,11 @@ def resolve_device(device_name: str | None) -> torch.device:
 
     try:
         resolved = torch.device(normalized)
-    except (TypeError, ValueError, RuntimeError) as exc:  # pragma: no cover - 設定エラー
+    except (
+        TypeError,
+        ValueError,
+        RuntimeError,
+    ) as exc:  # pragma: no cover - 設定エラー
         msg = f"Unsupported device specifier: {device_name!r}"
         raise ValueError(msg) from exc
 
@@ -379,7 +383,10 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
         amsgrad=False,  # Keras 既定
     )
 
-    # 8. モデルの最適化
+    # 8. GPU の利用確認
+    logger.info(f"[GPU CHECK] Model moved to: {next(model.parameters()).device}")
+
+    # 9. モデルの最適化
     # モデル可視化ファイルをコンパイル
     save_model_visuals(
         model,
@@ -390,11 +397,11 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
     # PyTorch 2.0 実行最適化
     model = torch.compile(model, mode="reduce-overhead")
 
-    # 9. 学習のための値設定
+    # 10. 学習のための値設定
     total_batches = ceil(len(train_y) / batch_size)  # １エポックあたりの総ステップ数
     progress_step = max(1, total_batches // 10)  # 学習進捗 10% 毎の表示用
 
-    # 10. 学習ループ
+    # 11. 学習ループ
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
         T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
