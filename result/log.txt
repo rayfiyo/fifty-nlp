@@ -1,0 +1,26 @@
+2025-10-08 06:08:40 __main__ INFO: device: cuda (cuda)
+2025-10-08 06:08:40 __main__ INFO: run_dir: /content/drive/MyDrive/fifty-nlp/result/2025-10-08_03-29-12_b8f5063
+2025-10-08 06:08:40 __main__ INFO: resume_checkpoint: /content/drive/MyDrive/fifty-nlp/result/2025-10-08_03-29-12_b8f5063/checkpoint_latest.pt
+2025-10-08 06:08:42 __main__ INFO: Resuming from epoch 2 (checkpoint saved at 2025-10-08T05:35:27)
+2025-10-08 06:08:46 __main__ INFO: batch_size: 128
+2025-10-08 06:08:46 __main__ INFO: epochs: 30
+2025-10-08 06:08:46 __main__ INFO: lr: 0.0005
+2025-10-08 06:08:46 __main__ INFO: n_classes: 75
+2025-10-08 06:08:46 __main__ INFO: n_subset: 6144000
+2025-10-08 06:08:46 __main__ INFO: eta_min: 1e-07
+2025-10-08 06:08:46 __main__ INFO: n_subset: 6144000
+2025-10-08 06:08:51 __main__ ERROR: Fatal error occurred: Error(s) in loading state_dict for FiFTyGRUModel:
+	Missing key(s) in state_dict: "embed.weight", "gru.weight_ih_l0", "gru.weight_hh_l0", "gru.bias_ih_l0", "gru.bias_hh_l0", "gru.weight_ih_l0_reverse", "gru.weight_hh_l0_reverse", "gru.bias_ih_l0_reverse", "gru.bias_hh_l0_reverse", "gru.weight_ih_l1", "gru.weight_hh_l1", "gru.bias_ih_l1", "gru.bias_hh_l1", "gru.weight_ih_l1_reverse", "gru.weight_hh_l1_reverse", "gru.bias_ih_l1_reverse", "gru.bias_hh_l1_reverse", "fc.weight", "fc.bias". 
+	Unexpected key(s) in state_dict: "_orig_mod.embed.weight", "_orig_mod.gru.weight_ih_l0", "_orig_mod.gru.weight_hh_l0", "_orig_mod.gru.bias_ih_l0", "_orig_mod.gru.bias_hh_l0", "_orig_mod.gru.weight_ih_l0_reverse", "_orig_mod.gru.weight_hh_l0_reverse", "_orig_mod.gru.bias_ih_l0_reverse", "_orig_mod.gru.bias_hh_l0_reverse", "_orig_mod.gru.weight_ih_l1", "_orig_mod.gru.weight_hh_l1", "_orig_mod.gru.bias_ih_l1", "_orig_mod.gru.bias_hh_l1", "_orig_mod.gru.weight_ih_l1_reverse", "_orig_mod.gru.weight_hh_l1_reverse", "_orig_mod.gru.bias_ih_l1_reverse", "_orig_mod.gru.bias_hh_l1_reverse", "_orig_mod.fc.weight", "_orig_mod.fc.bias". 
+Traceback (most recent call last):
+  File "/content/fifty-nlp/main.py", line 633, in <module>
+    main(device=resolved_device)
+  File "/content/fifty-nlp/main.py", line 502, in main
+    load_checkpoint(
+  File "/content/fifty-nlp/main.py", line 283, in load_checkpoint
+    model.load_state_dict(checkpoint["model_state"], strict=True)
+  File "/usr/local/lib/python3.12/dist-packages/torch/nn/modules/module.py", line 2593, in load_state_dict
+    raise RuntimeError(
+RuntimeError: Error(s) in loading state_dict for FiFTyGRUModel:
+	Missing key(s) in state_dict: "embed.weight", "gru.weight_ih_l0", "gru.weight_hh_l0", "gru.bias_ih_l0", "gru.bias_hh_l0", "gru.weight_ih_l0_reverse", "gru.weight_hh_l0_reverse", "gru.bias_ih_l0_reverse", "gru.bias_hh_l0_reverse", "gru.weight_ih_l1", "gru.weight_hh_l1", "gru.bias_ih_l1", "gru.bias_hh_l1", "gru.weight_ih_l1_reverse", "gru.weight_hh_l1_reverse", "gru.bias_ih_l1_reverse", "gru.bias_hh_l1_reverse", "fc.weight", "fc.bias". 
+	Unexpected key(s) in state_dict: "_orig_mod.embed.weight", "_orig_mod.gru.weight_ih_l0", "_orig_mod.gru.weight_hh_l0", "_orig_mod.gru.bias_ih_l0", "_orig_mod.gru.bias_hh_l0", "_orig_mod.gru.weight_ih_l0_reverse", "_orig_mod.gru.weight_hh_l0_reverse", "_orig_mod.gru.bias_ih_l0_reverse", "_orig_mod.gru.bias_hh_l0_reverse", "_orig_mod.gru.weight_ih_l1", "_orig_mod.gru.weight_hh_l1", "_orig_mod.gru.bias_ih_l1", "_orig_mod.gru.bias_hh_l1", "_orig_mod.gru.weight_ih_l1_reverse", "_orig_mod.gru.weight_hh_l1_reverse", "_orig_mod.gru.bias_ih_l1_reverse", "_orig_mod.gru.bias_hh_l1_reverse", "_orig_mod.fc.weight", "_orig_mod.fc.bias". 

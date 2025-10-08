@@ -50,6 +50,12 @@ from typing import Any
 PWD = Path(__file__).parent
 
 
+# チェックポイント関係のヘルパー
+def _unwrap_compiled(model: torch.nn.Module) -> torch.nn.Module:
+    """torch.compile されたモデルなら元の Module を返す（なければそのまま）"""
+    return getattr(model, "_orig_mod", model)
+
+
 def load_config() -> dict[str, Any]:
     """config.yml を読み込み、環境変数で上書き。"""
 
@@ -244,13 +250,14 @@ def save_checkpoint(
     extra: dict[str, Any] | None = None,
 ) -> None:
     """学習途中の状態を保存し、再開に備える。"""
+    model_to_save = _unwrap_compiled(model)
 
     checkpoint = {
         "epoch": epoch + 1,  # 次に実行するエポック
         "seed": seed,
         "run_type": run_type,
         "saved_at": _dt.datetime.now().isoformat(timespec="seconds"),
-        "model_state": model.state_dict(),
+        "model_state": model_to_save.state_dict(),
         "optimizer_state": optimizer.state_dict(),
         "scheduler_state": scheduler.state_dict(),
     }
@@ -280,7 +287,16 @@ def load_checkpoint(
         if checkpoint_data is not None
         else torch.load(checkpoint_path, map_location=device)
     )
-    model.load_state_dict(checkpoint["model_state"], strict=True)
+    state = checkpoint["model_state"]
+
+    # _orig_mod. 付きなら剥がす（後方互換）
+    if any(k.startswith("_orig_mod.") for k in state.keys()):
+        state = {k.replace("_orig_mod.", "", 1): v for k, v in state.items()}
+
+    # compile 済みでも未コンパイルでも、実体にロード
+    target = _unwrap_compiled(model)
+    target.load_state_dict(state, strict=True)
+
     optimizer.load_state_dict(checkpoint["optimizer_state"])
     scheduler.load_state_dict(checkpoint["scheduler_state"])
     return checkpoint
