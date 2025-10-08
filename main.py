@@ -382,7 +382,7 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
 
     # 3. ログ二重化
     configure_logging(run_dir)
-    logger.info(f"device: {device.type} ({device})")
+    logger.info(f"\ndevice: {device.type} ({device})")
     logger.info(f"run_dir: {run_dir}")
     if resuming:
         logger.info(f"resume_checkpoint: {checkpoint_path}")
