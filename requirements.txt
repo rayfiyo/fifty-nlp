@@ -1,5 +1,6 @@
-numpy==1.26.4
+numpy==2.3.3
 PyYAML==6.0.2
-torch==2.8.0
+PyYAML==6.0.3
+torch==2.7.1
 torchinfo==1.8.0
 torchview==0.2.7
