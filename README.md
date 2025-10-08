@@ -12,7 +12,11 @@ cd fifty-nlp && \
 ## Useage: Google Colab + Google Drive
 
 1. Drive をマウント
-   - Colab セルで `from google.colab import drive; drive.mount("/content/drive")` を実行
+   - Colab セルで次を実行
+   ```
+   from google.colab import drive;
+   drive.mount("/content/drive")
+   ```
    - OAuth で自身の Drive を接続
 2. リポジトリを配置し、依存関係をインストール
    ```
