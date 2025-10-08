@@ -13,10 +13,10 @@ cd fifty-nlp && \
 
 1. Drive をマウント
    - Colab セルで次を実行
-   ```
-   from google.colab import drive;
-   drive.mount("/content/drive")
-   ```
+     ```
+     from google.colab import drive;
+     drive.mount("/content/drive")
+     ```
    - OAuth で自身の Drive を接続
 2. リポジトリを配置し、依存関係をインストール
    ```
@@ -25,9 +25,16 @@ cd fifty-nlp && \
    pip install -r requirements.txt
    ```
 3. 設定ファイルを調整
-   - `config.yml` の `experiment.result_dir` や `data.base_dir` を Drive 上の保存先に書き換える
+   - `config.yml` の `experiment.result_dir` や `data.base_dir` を
+     Drive 上の保存先に書き換える
      - 例: `/content/drive/MyDrive/fifty-nlp/...`
      - マウントした Google Drive のルートディレクトリは `/content/drive/MyDrive/` である
+4. GPU の有効化
+   - ランタイム > ランタイムのタイプを変更 > ハードウェア アクセラレータ > GPU
+5. 実行する
+   ```
+   !cd /content/fifty-nlp && python main.py
+   ```
 
 ### Tips
 
