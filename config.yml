@@ -11,10 +11,11 @@ experiment:
   # Colab で Google Drive を使う例（/content/drive/MyDrive にある任意の保存先に置換）
   result_dir: "/content/drive/MyDrive/fifty-nlp/result"
 
-  # 中断から再開する場合の設定で、null 指定時は無効化
+  # 中断から再開する場合の設定
+  # 無効化は、null を指定（文字列ではない）
   # run_dir またはチェックポイント(.pt)を指定する
   # 相対パスで指定した場合は、result_dir からの相対パスになる
-  resume_from: null
+  resume_from: "2025-10-08_03-29-12_b8f5063"
 
 data: # データセットのパス周り
   splits: ["train", "val", "test"]
