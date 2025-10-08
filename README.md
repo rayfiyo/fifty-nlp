@@ -35,6 +35,7 @@ cd fifty-nlp && \
    - 学習再開時は `experiment.resume_from` に `<timestamp>_<tag>` または
      `<timestamp>_<tag>/checkpoint_latest.pt` を指定
      - 相対パスで指定すると、`result_root` からの相対パスになる
+     - エポック終了毎に保存される
 4. GPU の有効化
    - ランタイム > ランタイムのタイプを変更 > ハードウェア アクセラレータ > GPU
 5. 実行する
