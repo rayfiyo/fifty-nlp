@@ -17,8 +17,8 @@ cd fifty-nlp && \
 2. リポジトリを配置し、依存関係をインストール
    ```
    ! git clone https://github.com/rayfiyo/fifty-nlp.git /content/fifty-nlp && \
-   ! cd /content/fifty-nlp && \
-   ! pip install -r requirements.txt
+   cd /content/fifty-nlp && \
+   pip install -r requirements.txt
    ```
 3. 設定ファイルを調整
    - `config.yml` の `experiment.result_dir` や `data.base_dir` を Drive 上の保存先に書き換える
