@@ -5,17 +5,21 @@ type: "gru" # モデルの種類: cnn / lstm / gru
 experiment:
   seed: 42
   device: "gpu" # cpu / gpu / auto が指定可能（gpu は cuda と同義）
-  # result_dir: "result" # ローカルの場合
 
-  # /content/drive/MyDrive にある任意の保存先に置き換えること
-  result_dir: "/content/drive/MyDrive/fifty-nlp/result" # Colab で Google Drive を使う場合
+  # ローカルの場合の出力先のルートディレクトリ指定の例（相対パスの場合はリポジトリ直下）
+  # result_dir: "result"
+  # Colab で Google Drive を使う例（/content/drive/MyDrive にある任意の保存先に置換）
+  result_dir: "/content/drive/MyDrive/fifty-nlp/result"
+
+  # 中断から再開する場合の設定で、null 指定時は無効化
+  # run_dir またはチェックポイント(.pt)を指定する
+  # 相対パスで指定した場合は、result_dir からの相対パスになる
+  resume_from: "checkpoint"
 
 data: # データセットのパス周り
   splits: ["train", "val", "test"]
-  # base_dir: "~/dataset/" # ローカルの場合
-
-  # Drive 上に置いてマウントしておくと永続化できる
-  base_dir: "/content/drive/MyDrive/fifty-nlp/dataset/"
+  # base_dir: "~/dataset/" # ローカルのディレクトリを使う場合の例
+  base_dir: "/content/drive/MyDrive/fifty-nlp/dataset/" # Drive をマウントして使う場合の例
 
 model: # モデル構造（__init__→forward でデータが流れる順番）
   # embed_dim:      埋め込み次元数:           バイト値をベクトル化する際の出力次元数

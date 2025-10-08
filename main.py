@@ -232,6 +232,60 @@ def eval_model(
     return accuracy, total_batches, total
 
 
+def save_checkpoint(
+    *,
+    run_dir: Path,
+    epoch: int,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler._LRScheduler,
+    seed: int,
+    run_type: str,
+    extra: dict[str, Any] | None = None,
+) -> None:
+    """学習途中の状態を保存し、再開に備える。"""
+
+    checkpoint = {
+        "epoch": epoch + 1,  # 次に実行するエポック
+        "seed": seed,
+        "run_type": run_type,
+        "saved_at": _dt.datetime.now().isoformat(timespec="seconds"),
+        "model_state": model.state_dict(),
+        "optimizer_state": optimizer.state_dict(),
+        "scheduler_state": scheduler.state_dict(),
+    }
+    if extra:
+        checkpoint["extra"] = extra
+
+    latest_path = run_dir / "checkpoint_latest.pt"
+    torch.save(checkpoint, latest_path)
+
+    epoch_path = run_dir / f"checkpoint_epoch_{epoch + 1:03d}.pt"
+    torch.save(checkpoint, epoch_path)
+
+
+def load_checkpoint(
+    *,
+    checkpoint_path: Path,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: torch.optim.lr_scheduler._LRScheduler,
+    device: torch.device,
+    checkpoint_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """保存済みチェックポイントを読み込み、各モジュールへ復元する。"""
+
+    checkpoint = (
+        checkpoint_data
+        if checkpoint_data is not None
+        else torch.load(checkpoint_path, map_location=device)
+    )
+    model.load_state_dict(checkpoint["model_state"], strict=True)
+    optimizer.load_state_dict(checkpoint["optimizer_state"])
+    scheduler.load_state_dict(checkpoint["scheduler_state"])
+    return checkpoint
+
+
 def save_model_visuals(
     model: torch.nn.Module,
     run_dir: Path,
@@ -275,7 +329,8 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
     if not isinstance(device, torch.device):
         device = resolve_device(str(device))
 
-    seed = config["experiment"]["seed"]
+    experiment_cfg = config.get("experiment", {})
+    seed = experiment_cfg["seed"]
     set_seed(seed)
 
     # 1. タグのデフォルト値として直近コミットの先頭7桁を取得
@@ -291,16 +346,70 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
     except Exception:
         default_tag = ""
 
-    # 2. 実行用ディレクトリを作成
-    ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    tag = sys.argv[1] if len(sys.argv) > 1 else default_tag
+    # 2. 実行用ディレクトリと再開設定
+    result_root = Path(experiment_cfg["result_dir"]).expanduser()
+    if not result_root.is_absolute():
+        result_root = (PWD / result_root).resolve()
 
-    run_dir = PWD / Path(config["experiment"]["result_dir"]) / f"{ts}_{tag}"
+    resume_target = experiment_cfg.get("resume_from")
+    resuming = False
+    checkpoint_path: Path | None = None
+
+    if resume_target:
+        candidate = Path(resume_target).expanduser()
+        if not candidate.is_absolute():
+            candidate = result_root / resume_target
+
+        if candidate.is_file():
+            run_dir = candidate.parent
+            checkpoint_path = candidate
+            resuming = True
+        elif candidate.is_dir():
+            run_dir = candidate
+            checkpoint_path = run_dir / "checkpoint_latest.pt"
+            resuming = True
+        else:
+            raise FileNotFoundError(
+                f"resume_from が指すパスが存在しません: {candidate}"
+            )
+    else:
+        ts = _dt.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        tag = sys.argv[1] if len(sys.argv) > 1 else default_tag
+        run_dir = result_root / f"{ts}_{tag}"
+        checkpoint_path = run_dir / "checkpoint_latest.pt"
+
     run_dir.mkdir(parents=True, exist_ok=True)
 
     # 3. ログ二重化
     configure_logging(run_dir)
     logger.info(f"device: {device.type} ({device})")
+    logger.info(f"run_dir: {run_dir}")
+    if resuming:
+        logger.info(f"resume_checkpoint: {checkpoint_path}")
+        if checkpoint_path is None or not checkpoint_path.exists():
+            raise FileNotFoundError(
+                "resume_from が指定されていますが、チェックポイントが見つかりません"
+            )
+
+    checkpoint_data: dict[str, Any] | None = None
+    start_epoch = 0
+    if resuming and checkpoint_path is not None:
+        checkpoint_data = torch.load(checkpoint_path, map_location=device)
+        start_epoch = int(checkpoint_data.get("epoch", 0) or 0)
+        ckpt_run_type = checkpoint_data.get("run_type")
+        if ckpt_run_type and ckpt_run_type != run_type:
+            raise ValueError(
+                f"チェックポイントの run_type ({ckpt_run_type}) と "
+                f"現在の設定 ({run_type}) が一致しません"
+            )
+        ckpt_seed = checkpoint_data.get("seed")
+        if ckpt_seed is not None and ckpt_seed != seed:
+            logger.warning(
+                f"チェックポイントのシード値 ({ckpt_seed}) が現在の設定 ({seed}) と異なります"
+            )
+        logger.info(
+            f"Resuming from epoch {start_epoch} (checkpoint saved at {checkpoint_data.get('saved_at', 'n/a')})"
+        )
 
     # 4. データ読み込み
     splits = config["data"]["splits"]
@@ -383,31 +492,45 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
         amsgrad=False,  # Keras 既定
     )
 
-    # 8. GPU の利用確認
-    logger.info(f"[GPU CHECK] Model moved to: {next(model.parameters()).device}")
-
-    # 9. モデルの最適化
-    # モデル可視化ファイルをコンパイル
-    save_model_visuals(
-        model,
-        run_dir,
-        input_length=train_x.shape[1],
-        batch_size=batch_size,
-    )
-    # PyTorch 2.0 実行最適化
-    model = torch.compile(model, mode="reduce-overhead")
-
-    # 10. 学習のための値設定
-    total_batches = ceil(len(train_y) / batch_size)  # １エポックあたりの総ステップ数
-    progress_step = max(1, total_batches // 10)  # 学習進捗 10% 毎の表示用
-
-    # 11. 学習ループ
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
         optimizer,
         T_max=epochs,  # 周期 (= 総エポック数)；Cosine なので 1 期で eta_min まで下がる
         eta_min=eta_min,  # 最終学習率 (最小値)
     )
-    for epoch in range(epochs):
+
+    if resuming and checkpoint_path is not None and checkpoint_data is not None:
+        load_checkpoint(
+            checkpoint_path=checkpoint_path,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            device=device,
+            checkpoint_data=checkpoint_data,
+        )
+
+    # 8. モデル可視化（新規学習時のみ）
+    if not resuming:
+        save_model_visuals(
+            model,
+            run_dir,
+            input_length=train_x.shape[1],
+            batch_size=batch_size,
+        )
+
+    # PyTorch 2.0 実行最適化
+    model = torch.compile(model, mode="reduce-overhead")
+
+    # 9. 学習のための値設定
+    total_batches = ceil(len(train_y) / batch_size)  # １エポックあたりの総ステップ数
+    progress_step = max(1, total_batches // 10)  # 学習進捗 10% 毎の表示用
+
+    if start_epoch >= epochs:
+        logger.info(
+            "チェックポイントのエポック数が学習回数に到達しているため、追加学習はスキップします"
+        )
+
+    # 10. 学習ループ
+    for epoch in range(start_epoch, epochs):
         # 学習モード
         model.train()
 
@@ -447,8 +570,8 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
             )  # 勾配クリッピング
             optimizer.step()  # パラメータ更新
 
-            # 最初のエポックだけ 10 % ごとに進捗表示
-            if epoch == 0 and batch_idx % progress_step == 0:
+            # 最初の実行エポックだけ 10 % ごとに進捗表示
+            if epoch == start_epoch and batch_idx % progress_step == 0:
                 percent = int(batch_idx / total_batches * 100)
                 logger.info(
                     f"Epoch {epoch + 1}:"
@@ -460,7 +583,7 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
         scheduler.step()
 
         # 検証精度の評価（スモークテスト用バリデーション）
-        if epoch == 0 or (epoch + 1) % 12 == 0:
+        if epoch == start_epoch or (epoch + 1) % 12 == 0:
             val_acc, val_batches, val_samples = eval_model(
                 model, val_x, val_y, batch_size, device, max_batches=300
             )
@@ -472,6 +595,21 @@ def main(device: torch.device | str = "cpu") -> None:  # noqa: C901 (関数長�
 
         # エポック終了のログ
         logger.info(f"Epoch {epoch + 1}: done!")
+
+        save_checkpoint(
+            run_dir=run_dir,
+            epoch=epoch,
+            model=model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            seed=seed,
+            run_type=run_type,
+            extra={
+                "epochs": epochs,
+                "batch_size": batch_size,
+            },
+        )
+        logger.info(f"Epoch {epoch + 1}: checkpoint saved")
 
     # 12. テストデータでの最終評価
     full_test_acc, full_test_batches, full_test_samples = eval_model(
