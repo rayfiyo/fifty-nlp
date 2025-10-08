@@ -17,6 +17,7 @@ cd fifty-nlp && \
 - リポジトリを配置し、依存関係をインストール
   ```
   ! git clone https://github.com/rayfiyo/fifty-nlp.git /content/fifty-nlp && \
+  ! cd /content/fifty-nlp && \
   ! pip install -r requirements.txt
   ```
 - 個人設定ファイルを作成
