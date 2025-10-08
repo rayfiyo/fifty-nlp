@@ -1,0 +1,21 @@
+2025-09-22 09:07:08 __main__ INFO: batch_size: 128
+2025-09-22 09:07:08 __main__ INFO: epochs: 30
+2025-09-22 09:07:08 __main__ INFO: lr: 0.0005
+2025-09-22 09:07:08 __main__ INFO: n_classes: 75
+2025-09-22 09:07:08 __main__ INFO: n_subset: 6144000
+2025-09-22 09:07:08 __main__ INFO: eta_min: 1e-07
+2025-09-22 09:07:08 __main__ INFO: n_subset: 6144000
+2025-09-22 09:10:07 __main__ INFO: Epoch 1:progress 0% (batch 1/48000)
+2025-09-22 23:07:05 __main__ INFO: Epoch 1:progress 10% (batch 4801/48000)
+2025-09-23 10:53:10 __main__ INFO: Epoch 1:progress 20% (batch 9601/48000)
+2025-09-23 23:11:29 __main__ INFO: Epoch 1:progress 30% (batch 14401/48000)
+2025-09-24 11:06:16 __main__ INFO: Epoch 1:progress 40% (batch 19201/48000)
+2025-09-24 23:22:39 __main__ INFO: Epoch 1:progress 50% (batch 24001/48000)
+2025-09-25 11:19:46 __main__ INFO: Epoch 1:progress 60% (batch 28801/48000)
+2025-09-25 23:20:15 __main__ INFO: Epoch 1:progress 70% (batch 33601/48000)
+2025-09-26 11:39:55 __main__ INFO: Epoch 1:progress 80% (batch 38401/48000)
+2025-09-27 00:12:59 __main__ INFO: Epoch 1:progress 90% (batch 43201/48000)
+2025-09-27 12:45:43 __main__ INFO: Epoch 1: Validation: batches=300, samples=38400, acc=0.657
+2025-09-27 12:45:43 __main__ INFO: Epoch 1: done!
+2025-10-02 16:44:54 __main__ INFO: Epoch 2: done!
+2025-10-07 18:14:00 __main__ INFO: Epoch 3: done!
