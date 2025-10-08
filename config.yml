@@ -4,7 +4,7 @@ type: "gru" # モデルの種類: cnn / lstm / gru
 
 experiment:
   seed: 42
-  device: "gpu" # cpu / gpu / auto が指定可能（gpu は cuda と同義）
+  device: "cpu" # cpu / gpu / auto が指定可能（gpu は cuda と同義）
 
   # ローカルの場合の出力先のルートディレクトリ指定の例（相対パスの場合はリポジトリ直下）
   # result_dir: "result"
