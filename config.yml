@@ -14,7 +14,7 @@ experiment:
   # 中断から再開する場合の設定で、null 指定時は無効化
   # run_dir またはチェックポイント(.pt)を指定する
   # 相対パスで指定した場合は、result_dir からの相対パスになる
-  resume_from: "checkpoint"
+  resume_from: null
 
 data: # データセットのパス周り
   splits: ["train", "val", "test"]
